@@ -1,15 +1,17 @@
 package lambda
 
 import com.vdurmont.emoji.EmojiParser
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import org.jsoup.Jsoup
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest
-import software.amazon.awssdk.services.sqs.SqsClient
-import software.amazon.awssdk.services.sqs.model.SendMessageRequest
+import soppi.json.JsonSingleton
+import soppi.json.serializeToString
 
 class ScheduleBotRequestHandler {
 
@@ -36,7 +38,6 @@ class ScheduleBotRequestHandler {
         teams.forEach { team ->
             val scheduleUrl = "$baseUrl/team/${team.first}/schedule"
             val schedule = executeHttpGetRequest(scheduleUrl)
-            println(schedule)
             val doc = Jsoup.parse(schedule)
             val table = doc.select("table").last()
 
@@ -74,13 +75,26 @@ Reply with :thumbsup: if you are IN, reply with :thumbsdown:if you are OUT.""".t
 
                     val result = EmojiParser.parseToAliases(str)
 
-                    val sqsClient = SqsClient.create()
-                    sqsClient.sendMessage(
-                        SendMessageRequest.builder()
-                            .messageBody(result)
-                            .queueUrl("https://sqs.us-west-2.amazonaws.com/245053569556/RelayQueue")
-                            .build()
-                    )
+
+                    val client = OkHttpClient()
+
+                    val mediaType = "application/json".toMediaTypeOrNull()
+
+                    val params = mapOf("content" to result)
+                    val objectMapper = JsonSingleton.INSTANCE.getKotlinxObjectMapper()
+                    val body = objectMapper.serializeToString(params)
+
+                    val requestBody = RequestBody.create(mediaType, body)
+
+                    val request = Request.Builder()
+                        .url("https://discord.com/api/webhooks/1242343906549698561/U6wfYOCxcSlmPmGpgkgrb5bujNJQOZBjqOWM_P1iyU1G360oJNRHZWj50tNSGu5HnAj5")
+                        .post(requestBody)
+                        .addHeader("accept", "application/json")
+                        .addHeader("content-type", "application/json")
+                        .build()
+
+                    client.newCall(request).execute()
+
 
                     ddbClient.putItem(
                         PutItemRequest.builder().item(

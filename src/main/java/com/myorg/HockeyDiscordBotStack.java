@@ -24,7 +24,6 @@ import java.util.List;
 public class HockeyDiscordBotStack extends Stack {
     public static final String MAVEN_ASSET_CODE_PATH = "target/hockey-discord-bot-0.1.jar";
 
-    public static String RELAY_QUEUE_ARN;
 
     public HockeyDiscordBotStack(final Construct scope, final String id) {
         this(scope, id, null);
@@ -46,33 +45,6 @@ public class HockeyDiscordBotStack extends Stack {
             .architecture(Architecture.ARM_64)
             .build();
 
-        final var relayFunction =  Function.Builder.create(this, "Relay")
-            .functionName("Relay")
-            .runtime(Runtime.NODEJS_LATEST)
-            .memorySize(256)
-            .timeout(hockeyScheduleBotTimeout)
-            .code(Code.fromAsset("lambda"))
-            .handler("index.handler")
-            .architecture(Architecture.ARM_64)
-            .build();
-
-        final var relayQueue = Queue.Builder.create(this, "RelayQueue")
-            .visibilityTimeout(hockeyScheduleBotTimeout)
-            .queueName("RelayQueue")
-            .build();
-
-        final var sqsEventSourceMappingPermissions = new PolicyStatement();
-        sqsEventSourceMappingPermissions.addActions("sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes");
-        sqsEventSourceMappingPermissions.addResources("*");
-        relayFunction.addToRolePolicy(sqsEventSourceMappingPermissions);
-
-
-        final var relayEsm = EventSourceMapping.Builder.create(this, "RelayEsm")
-            .batchSize(1)
-            .enabled(true)
-            .eventSourceArn(relayQueue.getQueueArn())
-            .target(relayFunction)
-            .build();
 
         final var dedupeTable = Table.Builder.create(this, "DedupeTable")
             .tableName("DedupeTable")
@@ -83,7 +55,7 @@ public class HockeyDiscordBotStack extends Stack {
             .build();
 
         final var ddbFullAccessPermissions = new PolicyStatement();
-        ddbFullAccessPermissions.addActions("dynamodb:*", "sqs:*");
+        ddbFullAccessPermissions.addActions("dynamodb:*");
         ddbFullAccessPermissions.addResources("*");
         hockeyScheduleBotFunction.addToRolePolicy(ddbFullAccessPermissions);
 
