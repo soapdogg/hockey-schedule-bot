@@ -1,9 +1,8 @@
 package lambda
 
 import com.vdurmont.emoji.EmojiParser
-import org.http4k.client.Java8HttpClient
-import org.http4k.core.Method
-import org.http4k.core.Request
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.jsoup.Jsoup
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
@@ -17,7 +16,7 @@ class ScheduleBotRequestHandler {
     fun handleRequest() {
         println("Hello from scheduler")
 
-        val base_url = "https://krakenhockeyleague.com"
+        val baseUrl = "https://krakenhockeyleague.com"
 
         val teams = listOf(Pair("10159", "Reindeer5D"), Pair("9943", "Seals6A"))
         val arenas = mapOf(
@@ -35,10 +34,12 @@ class ScheduleBotRequestHandler {
         val ddbClient = DynamoDbClient.create()
 
         teams.forEach { team ->
-            val scheduleUrl = "$base_url/team/${team.first}/schedule"
+            val scheduleUrl = "$baseUrl/team/${team.first}/schedule"
             val schedule = executeHttpGetRequest(scheduleUrl)
+            println(schedule)
             val doc = Jsoup.parse(schedule)
             val table = doc.select("table").last()
+
 
             table?.select("tbody")?.forEach {
                 val game = it.select("tr").last()
@@ -66,11 +67,9 @@ class ScheduleBotRequestHandler {
                 )
 
                 if (!dedupeResult.hasItem()) {
-
-
                     val str = """
 Game #$gameNumber of the season is on **$gameDate @ $gameTime**.
-We will be playing at [$location]($arenaLink) against the [$opponent]($base_url$opponentLink ). We are the $ha team.
+We will be playing at [$location]($arenaLink) against the [$opponent]($baseUrl$opponentLink ). We are the $ha team.
 Reply with :thumbsup: if you are IN, reply with :thumbsdown:if you are OUT.""".trimIndent()
 
                     val result = EmojiParser.parseToAliases(str)
@@ -98,16 +97,19 @@ Reply with :thumbsup: if you are IN, reply with :thumbsdown:if you are OUT.""".t
     }
 
     private fun executeHttpGetRequest(url: String): String {
-        val request = Request(Method.GET, url)
+        val client = OkHttpClient()
 
-        println("Request: ${request.uri}")
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .build()
 
-        val client = Java8HttpClient()
-        val response = client(request)
+        println("Request: ${request.url}")
 
-        println("Response: ${response.status}")
+        val response = client.newCall(request).execute()
+        println("Response: ${response.code}")
 
-        return response.bodyString()
+        return response.body?.string()!!
     }
 
     private fun hashAll(vararg vals: Any?): Long {

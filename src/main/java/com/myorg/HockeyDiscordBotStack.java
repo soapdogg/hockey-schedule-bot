@@ -83,7 +83,7 @@ public class HockeyDiscordBotStack extends Stack {
             .build();
 
         final var ddbFullAccessPermissions = new PolicyStatement();
-        ddbFullAccessPermissions.addActions("dynamodb:*");
+        ddbFullAccessPermissions.addActions("dynamodb:*", "sqs:*");
         ddbFullAccessPermissions.addResources("*");
         hockeyScheduleBotFunction.addToRolePolicy(ddbFullAccessPermissions);
 
