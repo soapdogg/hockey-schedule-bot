@@ -20,7 +20,7 @@ class ScheduleBotRequestHandler {
 
         val baseUrl = "https://krakenhockeyleague.com"
 
-        val teams = listOf(Pair("10159", "Reindeer5D"), Pair("9943", "Seals6A"))
+        val teams = listOf(Pair("10159", "Reindeer5D"))
         val arenas = mapOf(
             "KVIC" to "https://maps.app.goo.gl/587sGU8sbtiGcVsp6",
             "KCI VMFH" to "https://maps.app.goo.gl/GTwM6Tx1aicFdjQ48",
@@ -87,7 +87,7 @@ Reply with :thumbsup: if you are IN, reply with :thumbsdown:if you are OUT.""".t
                     val requestBody = RequestBody.create(mediaType, body)
 
                     val request = Request.Builder()
-                        .url("https://discord.com/api/webhooks/1242343906549698561/U6wfYOCxcSlmPmGpgkgrb5bujNJQOZBjqOWM_P1iyU1G360oJNRHZWj50tNSGu5HnAj5")
+                        .url("https://discord.com/api/webhooks/1246515419158675587/hivn6lT_vPJgWkWh9i-TgOxtXlf-tu0KwH08L9yLq2ogKY-YkgZRrmhewF_tYxYJQbic")
                         .post(requestBody)
                         .addHeader("accept", "application/json")
                         .addHeader("content-type", "application/json")
