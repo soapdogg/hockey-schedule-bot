@@ -12,14 +12,11 @@ import software.amazon.awscdk.services.iam.ServicePrincipal;
 import software.amazon.awscdk.services.lambda.*;
 import software.amazon.awscdk.services.lambda.Runtime;
 import software.amazon.awscdk.services.scheduler.CfnSchedule;
-import software.amazon.awscdk.services.sqs.Queue;
 import software.constructs.Construct;
 import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
 
 import java.util.List;
-// import software.amazon.awscdk.Duration;
-// import software.amazon.awscdk.services.sqs.Queue;
 
 public class HockeyDiscordBotStack extends Stack {
     public static final String MAVEN_ASSET_CODE_PATH = "target/hockey-discord-bot-0.1.jar";
