@@ -5,6 +5,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody
+import okio.Buffer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.AfterEach
 import kotlin.test.assertEquals
@@ -128,7 +129,7 @@ class HttpClientTest {
         httpClient.publishPoll("channelId", "Test question?", 12)
 
         val capturedRequest = requestSlot.captured
-        val bodyBuffer = okio.Buffer()
+        val bodyBuffer = Buffer()
         capturedRequest.body?.writeTo(bodyBuffer)
         val bodyString = bodyBuffer.readUtf8()
         
@@ -162,7 +163,7 @@ class HttpClientTest {
         httpClient.publishPoll("channelId", "Question", 5)
 
         val capturedRequest = requestSlot.captured
-        val bodyBuffer = okio.Buffer()
+        val bodyBuffer = Buffer()
         capturedRequest.body?.writeTo(bodyBuffer)
         val bodyString = bodyBuffer.readUtf8()
         

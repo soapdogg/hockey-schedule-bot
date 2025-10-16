@@ -237,6 +237,6 @@ class GameExtractorTest {
         extractor.extractGames(team)
 
         assertTrue(urlSlot.captured.contains("12345"))
-        assertTrue(urlSlot.captured.contains("krakenhockeyleague.com"))
+        assertTrue(urlSlot.captured.startsWith(Fixtures.KRAKEN_HOCKEY_LEAGUE_WEBSITE))
     }
 }

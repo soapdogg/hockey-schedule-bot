@@ -46,7 +46,8 @@ class JsonSerializerTest {
     fun `toJsonElement converts map to JsonObject`() {
         val result = JsonSerializer.run { mapOf("key" to "value").toJsonElement() }
         assertTrue(result is JsonObject)
-        assertEquals("value", (result as JsonObject)["key"]?.toString()?.trim('"'))
+        val jsonObject = result as JsonObject
+        assertEquals("value", jsonObject["key"]?.jsonPrimitive?.content)
     }
 
     @Test
