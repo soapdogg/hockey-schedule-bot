@@ -47,4 +47,4 @@ jobs:
       with:
         default_author: github_actions
         message: 'Update coverage badge'
-        add: '*.svg'
+        add: '.github/badges/*.svg'

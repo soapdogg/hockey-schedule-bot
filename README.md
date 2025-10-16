@@ -13,6 +13,8 @@
 
 Hockey Schedule Bot is an automated Discord bot built with AWS CDK, Kotlin, and Java that monitors hockey team schedules and publishes game information to Discord channels. The bot scrapes game schedules from the Kraken Hockey League website and automatically posts upcoming game details including date, time, opponent, and location to designated Discord channels.
 
+> **Note:** Coverage badges are automatically generated and updated by the CI workflow after each push to the main branch.
+
 ### Key Features
 
 - **Automated Schedule Monitoring**: Runs on a scheduled basis (daily at 8 PM PST) via AWS EventBridge
