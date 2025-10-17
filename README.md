@@ -67,6 +67,8 @@ mvn test
 
 ### Deploying to AWS
 
+#### Manual Deployment
+
 1. Synthesize the CloudFormation template:
    ```bash
    cdk synth
@@ -76,6 +78,74 @@ mvn test
    ```bash
    cdk deploy
    ```
+
+#### Automatic Deployment (CI/CD)
+
+The project includes a GitHub Actions workflow that automatically deploys to AWS when changes are merged to the `main` branch. The workflow:
+1. Builds the project with Maven
+2. Synthesizes the CDK stack
+3. Deploys to your AWS account
+
+**Setup Instructions:**
+
+To enable automatic deployment, you need to configure AWS authentication using OpenID Connect (OIDC), which is more secure than using long-lived credentials:
+
+1. **Create an IAM OIDC Identity Provider in AWS:**
+   - Go to IAM Console → Identity Providers → Add Provider
+   - Provider Type: OpenID Connect
+   - Provider URL: `https://token.actions.githubusercontent.com`
+   - Audience: `sts.amazonaws.com`
+
+2. **Create an IAM Role for GitHub Actions:**
+   ```bash
+   # Create a trust policy file (trust-policy.json):
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Principal": {
+           "Federated": "arn:aws:iam::<YOUR_AWS_ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+         },
+         "Action": "sts:AssumeRoleWithWebIdentity",
+         "Condition": {
+           "StringEquals": {
+             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+           },
+           "StringLike": {
+             "token.actions.githubusercontent.com:sub": "repo:soapdogg/hockey-schedule-bot:ref:refs/heads/main"
+           }
+         }
+       }
+     ]
+   }
+   
+   # Create the role:
+   aws iam create-role --role-name GitHubActionsDeployRole --assume-role-policy-document file://trust-policy.json
+   
+   # Attach necessary policies (adjust permissions as needed):
+   aws iam attach-role-policy --role-name GitHubActionsDeployRole --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+   ```
+
+3. **Add GitHub Secrets:**
+   Go to your repository Settings → Secrets and variables → Actions → New repository secret:
+   
+   - `AWS_ROLE_ARN`: The ARN of the IAM role created above (e.g., `arn:aws:iam::123456789012:role/GitHubActionsDeployRole`)
+   - `AWS_REGION`: Your AWS region (e.g., `us-west-2`)
+
+4. **Optional: Restrict Permissions**
+   For production use, consider replacing `AdministratorAccess` with a more restrictive policy that only grants permissions needed for CDK deployment:
+   - CloudFormation full access
+   - Lambda create/update/delete
+   - DynamoDB create/update/delete
+   - IAM role/policy management
+   - EventBridge Scheduler access
+   - S3 access for CDK assets
+
+**Security Notes:**
+- The OIDC approach does not require storing long-lived AWS credentials in GitHub
+- The trust policy restricts access to only the `main` branch of this repository
+- Tokens are short-lived and automatically rotated by GitHub
 
 ### Configuration
 
