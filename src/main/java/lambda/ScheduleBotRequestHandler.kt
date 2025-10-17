@@ -35,7 +35,7 @@ class ScheduleBotRequestHandler() {
                     game.hash
                 )
 
-                if (true) {
+                if (!hasGameBeenPreviouslyPublished) {
                     val arenaLink = Fixtures.ARENAS_TO_LOCATION.getValue(game.arena)
                     val dateString = game.date + " @ " + game.time
                     val content = """
