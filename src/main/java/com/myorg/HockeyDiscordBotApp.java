@@ -10,15 +10,23 @@ public class HockeyDiscordBotApp {
     public static void main(final String[] args) {
         App app = new App();
 
-        new HockeyDiscordBotStack(app, "HockeyDiscordBotStack", StackProps.builder()
-                // Use environment variables for account and region when available (e.g., in CI/CD).
-                // Falls back to environment-agnostic mode if not set.
-                .env(Environment.builder()
-                        .account(System.getenv("CDK_DEFAULT_ACCOUNT"))
-                        .region(System.getenv("CDK_DEFAULT_REGION"))
-                        .build())
-                // For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
-                .build());
+        // Build stack props with optional environment configuration
+        StackProps.Builder stackPropsBuilder = StackProps.builder();
+        
+        // Use environment variables for account and region when available (e.g., in CI/CD).
+        // Falls back to environment-agnostic mode if not set.
+        String account = System.getenv("CDK_DEFAULT_ACCOUNT");
+        String region = System.getenv("CDK_DEFAULT_REGION");
+        
+        if (account != null && region != null) {
+            stackPropsBuilder.env(Environment.builder()
+                    .account(account)
+                    .region(region)
+                    .build());
+        }
+        // If env vars not set, stack will be environment-agnostic
+        
+        new HockeyDiscordBotStack(app, "HockeyDiscordBotStack", stackPropsBuilder.build());
 
         app.synth();
     }
