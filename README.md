@@ -7,7 +7,6 @@
 [![Kotlin Version](https://img.shields.io/badge/Kotlin-2.0.0-purple.svg)](https://kotlinlang.org/)
 [![Maven](https://img.shields.io/badge/Maven-3.x-red.svg)](https://maven.apache.org/)
 [![AWS CDK](https://img.shields.io/badge/AWS_CDK-2.142.1-orange.svg)](https://aws.amazon.com/cdk/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Overview
 
@@ -113,7 +112,3 @@ src/
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
