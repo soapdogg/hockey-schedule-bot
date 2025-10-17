@@ -18,13 +18,14 @@ public class HockeyDiscordBotApp {
         String account = System.getenv("CDK_DEFAULT_ACCOUNT");
         String region = System.getenv("CDK_DEFAULT_REGION");
         
-        if (account != null && region != null) {
+        if (account != null && !account.trim().isEmpty() && 
+            region != null && !region.trim().isEmpty()) {
             stackPropsBuilder.env(Environment.builder()
                     .account(account)
                     .region(region)
                     .build());
         }
-        // If env vars not set, stack will be environment-agnostic
+        // If env vars not set or empty, stack will be environment-agnostic
         
         new HockeyDiscordBotStack(app, "HockeyDiscordBotStack", stackPropsBuilder.build());
 
