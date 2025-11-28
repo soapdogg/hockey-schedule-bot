@@ -32,6 +32,13 @@ public class HockeyDiscordBotStack extends Stack {
         // The code that defines your stack goes here
 
         final var hockeyScheduleBotTimeout = Duration.seconds(60);
+
+        // Get Discord bot token from environment variable
+        final var discordBotToken = System.getenv("DISCORDBOTTOKEN");
+        if (discordBotToken == null || discordBotToken.isEmpty()) {
+            throw new RuntimeException("DISCORDBOTTOKEN environment variable must be set");
+        }
+
         final var hockeyScheduleBotFunction = Function.Builder.create(this, "HockeyScheduleBot")
             .functionName("HockeyScheduleBot")
             .runtime(Runtime.JAVA_21)
@@ -40,6 +47,7 @@ public class HockeyDiscordBotStack extends Stack {
             .code(new AssetCode(MAVEN_ASSET_CODE_PATH))
             .handler("lambda.ScheduleBotRequestHandler::handleRequest")
             .architecture(Architecture.ARM_64)
+            .environment(java.util.Map.of("DISCORDBOTTOKEN", discordBotToken))
             .build();
 
 

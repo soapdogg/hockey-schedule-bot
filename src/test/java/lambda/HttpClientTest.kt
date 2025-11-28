@@ -100,8 +100,13 @@ class HttpClientTest {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
         val mockResponse = mockk<Response>()
+        val mockResponseBody = mockk<ResponseBody>()
         val requestSlot = slot<Request>()
-        
+
+        every { mockResponse.code } returns 200
+        every { mockResponse.isSuccessful } returns true
+        every { mockResponseBody.string() } returns "{}"
+        every { mockResponse.body } returns mockResponseBody
         every { mockCall.execute() } returns mockResponse
         every { mockOkHttpClient.newCall(capture(requestSlot)) } returns mockCall
 
@@ -120,8 +125,13 @@ class HttpClientTest {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
         val mockResponse = mockk<Response>()
+        val mockResponseBody = mockk<ResponseBody>()
         val requestSlot = slot<Request>()
-        
+
+        every { mockResponse.code } returns 200
+        every { mockResponse.isSuccessful } returns true
+        every { mockResponseBody.string() } returns "{}"
+        every { mockResponse.body } returns mockResponseBody
         every { mockCall.execute() } returns mockResponse
         every { mockOkHttpClient.newCall(capture(requestSlot)) } returns mockCall
 
@@ -132,7 +142,7 @@ class HttpClientTest {
         val bodyBuffer = Buffer()
         capturedRequest.body?.writeTo(bodyBuffer)
         val bodyString = bodyBuffer.readUtf8()
-        
+
         // Verify the poll structure
         assert(bodyString.contains("\"poll\""))
         assert(bodyString.contains("\"question\""))
@@ -140,7 +150,7 @@ class HttpClientTest {
         assert(bodyString.contains("\"duration\""))
         assert(bodyString.contains("12"))
         assert(bodyString.contains("\"answers\""))
-        
+
         // Verify poll options
         assert(bodyString.contains("Forward"))
         assert(bodyString.contains("Defense"))
@@ -154,8 +164,13 @@ class HttpClientTest {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
         val mockResponse = mockk<Response>()
+        val mockResponseBody = mockk<ResponseBody>()
         val requestSlot = slot<Request>()
-        
+
+        every { mockResponse.code } returns 200
+        every { mockResponse.isSuccessful } returns true
+        every { mockResponseBody.string() } returns "{}"
+        every { mockResponse.body } returns mockResponseBody
         every { mockCall.execute() } returns mockResponse
         every { mockOkHttpClient.newCall(capture(requestSlot)) } returns mockCall
 
@@ -166,7 +181,7 @@ class HttpClientTest {
         val bodyBuffer = Buffer()
         capturedRequest.body?.writeTo(bodyBuffer)
         val bodyString = bodyBuffer.readUtf8()
-        
+
         assert(bodyString.contains("\"allow_multiselect\":false"))
     }
 }

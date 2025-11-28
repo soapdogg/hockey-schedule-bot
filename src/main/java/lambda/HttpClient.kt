@@ -67,6 +67,10 @@ class HttpClient(
             put("poll", pollJson)
         }
 
+        println("Publishing poll to channel: $channelId")
+        println("Poll expiration: $pollExpiration hours")
+        println("Request body: ${messageJson.toString()}")
+
         val requestBody = messageJson.toString().toRequestBody(jsonMediaType)
         val request = Request.Builder()
             .url("$baseUrl/channels/$channelId/messages")
@@ -75,6 +79,15 @@ class HttpClient(
             .post(requestBody)
             .build()
 
-        client.newCall(request).execute()
+        val response = client.newCall(request).execute()
+        println("Poll publish response code: ${response.code}")
+        val responseBody = response.body?.string()
+        println("Poll publish response body: $responseBody")
+
+        if (!response.isSuccessful) {
+            println("ERROR: Failed to publish poll. Status: ${response.code}, Body: $responseBody")
+        } else {
+            println("Successfully published poll")
+        }
     }
 }

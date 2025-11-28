@@ -13,6 +13,8 @@ import java.util.Locale
 class ScheduleBotRequestHandler() {
 
     fun handleRequest() {
+        println("=== Hockey Schedule Bot Lambda Starting ===")
+        println("Bot token available: ${if (Fixtures.BOT_TOKEN != null && Fixtures.BOT_TOKEN.isNotEmpty()) "Yes" else "No"}")
         val httpClient = HttpClient(OkHttpClient())
         val gameExtractor = GameExtractor(httpClient)
         val database = Database(DynamoDbClient.create())
@@ -21,11 +23,16 @@ class ScheduleBotRequestHandler() {
         )
         val clock = Clock.system(ZoneId.of("America/Los_Angeles"))
         val now = LocalDateTime.now(clock)
+        println("Current time (PST): $now")
+        println("Processing ${teams.size} team(s)")
 
         teams.forEach { team ->
+            println("\n--- Processing team: ${team.name} ---")
 
             val games = gameExtractor.extractGames(team)
+            println("Found ${games.size} game(s) for team ${team.name}")
             games.forEach { game ->
+                println("\nProcessing game #${game.number}: ${game.opponent} on ${game.date} @ ${game.time}")
 
                 val hasGameBeenPreviouslyPublished = database.hasItem(
                     Fixtures.DEDUPE_TABLE_NAME,
@@ -34,8 +41,10 @@ class ScheduleBotRequestHandler() {
                     team.name,
                     game.hash
                 )
+                println("Game already published: $hasGameBeenPreviouslyPublished")
 
                 if (!hasGameBeenPreviouslyPublished) {
+                    println("Publishing new game announcement...")
                     val arenaLink = Fixtures.ARENAS_TO_LOCATION.getValue(game.arena)
                     val dateString = game.date + " @ " + game.time
                     val content = """
@@ -57,11 +66,27 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
 
                     val pollExpiration = (Duration.between(now, gameLocalDateTime).seconds / (60 * 60)) -1
 
-                    httpClient.publishPoll(
-                        team.apiChannelId,
-                        question = "Are you in for the game against the ${game.opponent} on $dateString?",
-                        pollExpiration.toInt()
-                    )
+                    println("Game date/time: $gameDateStringWithYear")
+                    println("Current time: $now")
+                    println("Game local date time: $gameLocalDateTime")
+                    println("Calculated poll expiration: $pollExpiration hours")
+
+                    if (pollExpiration < 1) {
+                        println("WARNING: Poll expiration is less than 1 hour ($pollExpiration). Skipping poll creation.")
+                    } else if (pollExpiration > 168) {
+                        println("WARNING: Poll expiration is greater than 168 hours ($pollExpiration). Setting to 168.")
+                        httpClient.publishPoll(
+                            team.apiChannelId,
+                            question = "Are you in for the game against the ${game.opponent} on $dateString?",
+                            168
+                        )
+                    } else {
+                        httpClient.publishPoll(
+                            team.apiChannelId,
+                            question = "Are you in for the game against the ${game.opponent} on $dateString?",
+                            pollExpiration.toInt()
+                        )
+                    }
 
                     database.putItem(
                         Fixtures.DEDUPE_TABLE_NAME,
