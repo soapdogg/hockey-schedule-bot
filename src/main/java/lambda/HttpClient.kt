@@ -6,8 +6,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
-import org.json.JSONObject
 
 class HttpClient(
     private val client: OkHttpClient
@@ -18,9 +16,17 @@ class HttpClient(
             .get()
             .build()
 
-        val response = client.newCall(request).execute()
-
-        return response.body?.string()!!
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IllegalStateException("HTTP GET failed with status ${response.code} for $url")
+                }
+                response.body?.string() ?: throw IllegalStateException("Response body was null for GET $url")
+            }
+        } catch (e: Exception) {
+            println("ERROR: HTTP GET request failed for $url: ${e.message}")
+            throw e
+        }
     }
 
     fun executeHttpPostRequest(url: String, content: String) {
@@ -38,7 +44,16 @@ class HttpClient(
             .addHeader("content-type", "application/json")
             .build()
 
-        client.newCall(request).execute()
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    println("WARNING: Webhook POST failed with status ${response.code}: ${response.body?.string()}")
+                }
+            }
+        } catch (e: Exception) {
+            println("ERROR: Webhook POST request failed for $url: ${e.message}")
+            throw e
+        }
     }
 
     fun publishPoll(
@@ -46,48 +61,47 @@ class HttpClient(
         question: String,
         pollExpiration: Int
     ) {
-        val baseUrl = "https://discord.com/api/v10"
         val jsonMediaType = "application/json; charset=utf-8".toMediaType()
         val options = listOf("Forward", "Defense", "Flex", "Goalie", "Out")
-        // Create poll using Discord's poll feature (introduced in 2024)
-        val pollJson = JSONObject().apply {
-            put("question", JSONObject().put("text", question))
-            put("answers", JSONArray().apply {
-                options.forEachIndexed { index, option ->
-                    put(JSONObject().apply {
-                        put("poll_media", JSONObject().put("text", option))
-                    })
-                }
-            })
-            put("duration", pollExpiration) // Duration in hours (1-168)
-            put("allow_multiselect", false)
-        }
 
-        val messageJson = JSONObject().apply {
-            put("poll", pollJson)
-        }
+        val pollData = mapOf(
+            "poll" to mapOf(
+                "question" to mapOf("text" to question),
+                "answers" to options.map { mapOf("poll_media" to mapOf("text" to it)) },
+                "duration" to pollExpiration,
+                "allow_multiselect" to false
+            )
+        )
+
+        val messageJson = JsonSerializer.serializeToString(pollData)
 
         println("Publishing poll to channel: $channelId")
         println("Poll expiration: $pollExpiration hours")
-        println("Request body: ${messageJson.toString()}")
+        println("Request body: $messageJson")
 
-        val requestBody = messageJson.toString().toRequestBody(jsonMediaType)
+        val requestBody = messageJson.toRequestBody(jsonMediaType)
         val request = Request.Builder()
-            .url("$baseUrl/channels/$channelId/messages")
+            .url("${Fixtures.DISCORD_API_BASE_URL}/channels/$channelId/messages")
             .addHeader("Authorization", "Bot ${Fixtures.BOT_TOKEN}")
             .addHeader("Content-Type", "application/json")
             .post(requestBody)
             .build()
 
-        val response = client.newCall(request).execute()
-        println("Poll publish response code: ${response.code}")
-        val responseBody = response.body?.string()
-        println("Poll publish response body: $responseBody")
+        try {
+            client.newCall(request).execute().use { response ->
+                println("Poll publish response code: ${response.code}")
+                val responseBody = response.body?.string()
+                println("Poll publish response body: $responseBody")
 
-        if (!response.isSuccessful) {
-            println("ERROR: Failed to publish poll. Status: ${response.code}, Body: $responseBody")
-        } else {
-            println("Successfully published poll")
+                if (!response.isSuccessful) {
+                    println("ERROR: Failed to publish poll. Status: ${response.code}, Body: $responseBody")
+                } else {
+                    println("Successfully published poll")
+                }
+            }
+        } catch (e: Exception) {
+            println("ERROR: Poll publish request failed for channel $channelId: ${e.message}")
+            throw e
         }
     }
 }
