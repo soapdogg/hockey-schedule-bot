@@ -21,11 +21,12 @@ class HttpClientTest {
     fun `executeHttpGetRequest returns response body`() {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
-        val mockResponse = mockk<Response>()
+        val mockResponse = mockk<Response>(relaxed = true)
         val mockResponseBody = mockk<ResponseBody>()
-        
+
         every { mockResponseBody.string() } returns "test response"
         every { mockResponse.body } returns mockResponseBody
+        every { mockResponse.isSuccessful } returns true
         every { mockCall.execute() } returns mockResponse
         every { mockOkHttpClient.newCall(any()) } returns mockCall
 
@@ -41,12 +42,13 @@ class HttpClientTest {
     fun `executeHttpGetRequest builds correct request`() {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
-        val mockResponse = mockk<Response>()
+        val mockResponse = mockk<Response>(relaxed = true)
         val mockResponseBody = mockk<ResponseBody>()
         val requestSlot = slot<Request>()
-        
+
         every { mockResponseBody.string() } returns "response"
         every { mockResponse.body } returns mockResponseBody
+        every { mockResponse.isSuccessful } returns true
         every { mockCall.execute() } returns mockResponse
         every { mockOkHttpClient.newCall(capture(requestSlot)) } returns mockCall
 
@@ -62,9 +64,10 @@ class HttpClientTest {
     fun `executeHttpPostRequest sends content in body`() {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
-        val mockResponse = mockk<Response>()
+        val mockResponse = mockk<Response>(relaxed = true)
         val requestSlot = slot<Request>()
-        
+
+        every { mockResponse.isSuccessful } returns true
         every { mockCall.execute() } returns mockResponse
         every { mockOkHttpClient.newCall(capture(requestSlot)) } returns mockCall
 
@@ -81,9 +84,10 @@ class HttpClientTest {
     fun `executeHttpPostRequest sets correct headers`() {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
-        val mockResponse = mockk<Response>()
+        val mockResponse = mockk<Response>(relaxed = true)
         val requestSlot = slot<Request>()
-        
+
+        every { mockResponse.isSuccessful } returns true
         every { mockCall.execute() } returns mockResponse
         every { mockOkHttpClient.newCall(capture(requestSlot)) } returns mockCall
 
@@ -99,7 +103,7 @@ class HttpClientTest {
     fun `publishPoll sends correct request to Discord API`() {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
-        val mockResponse = mockk<Response>()
+        val mockResponse = mockk<Response>(relaxed = true)
         val mockResponseBody = mockk<ResponseBody>()
         val requestSlot = slot<Request>()
 
@@ -116,7 +120,6 @@ class HttpClientTest {
         val capturedRequest = requestSlot.captured
         assertEquals("POST", capturedRequest.method)
         assertEquals("https://discord.com/api/v10/channels/123456/messages", capturedRequest.url.toString())
-        // Authorization header will have whatever is in DISCORDBOTTOKEN env var
         assertEquals("application/json", capturedRequest.header("Content-Type"))
     }
 
@@ -124,7 +127,7 @@ class HttpClientTest {
     fun `publishPoll includes poll configuration in request body`() {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
-        val mockResponse = mockk<Response>()
+        val mockResponse = mockk<Response>(relaxed = true)
         val mockResponseBody = mockk<ResponseBody>()
         val requestSlot = slot<Request>()
 
@@ -163,7 +166,7 @@ class HttpClientTest {
     fun `publishPoll sets allow_multiselect to false`() {
         val mockOkHttpClient = mockk<OkHttpClient>()
         val mockCall = mockk<okhttp3.Call>()
-        val mockResponse = mockk<Response>()
+        val mockResponse = mockk<Response>(relaxed = true)
         val mockResponseBody = mockk<ResponseBody>()
         val requestSlot = slot<Request>()
 

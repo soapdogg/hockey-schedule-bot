@@ -6,7 +6,6 @@ import software.amazon.awscdk.services.dynamodb.AttributeType;
 import software.amazon.awscdk.services.dynamodb.BillingMode;
 import software.amazon.awscdk.services.dynamodb.Table;
 import software.amazon.awscdk.services.iam.ManagedPolicy;
-import software.amazon.awscdk.services.iam.PolicyStatement;
 import software.amazon.awscdk.services.iam.Role;
 import software.amazon.awscdk.services.iam.ServicePrincipal;
 import software.amazon.awscdk.services.lambda.*;
@@ -17,6 +16,7 @@ import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
 
 import java.util.List;
+import java.util.Map;
 
 public class HockeyDiscordBotStack extends Stack {
     public static final String MAVEN_ASSET_CODE_PATH = "target/hockey-discord-bot-0.1.jar";
@@ -29,27 +29,12 @@ public class HockeyDiscordBotStack extends Stack {
     public HockeyDiscordBotStack(final Construct scope, final String id, final StackProps props) {
         super(scope, id, props);
 
-        // The code that defines your stack goes here
-
         final var hockeyScheduleBotTimeout = Duration.seconds(60);
 
-        // Get Discord bot token from environment variable
-        final var discordBotToken = System.getenv("DISCORDBOTTOKEN");
-        if (discordBotToken == null || discordBotToken.isEmpty()) {
-            throw new RuntimeException("DISCORDBOTTOKEN environment variable must be set");
-        }
-
-        final var hockeyScheduleBotFunction = Function.Builder.create(this, "HockeyScheduleBot")
-            .functionName("HockeyScheduleBot")
-            .runtime(Runtime.JAVA_21)
-            .memorySize(256)
-            .timeout(hockeyScheduleBotTimeout)
-            .code(new AssetCode(MAVEN_ASSET_CODE_PATH))
-            .handler("lambda.ScheduleBotRequestHandler::handleRequest")
-            .architecture(Architecture.ARM_64)
-            .environment(java.util.Map.of("DISCORDBOTTOKEN", discordBotToken))
-            .build();
-
+        // Get configuration from environment variables
+        final var discordBotToken = getRequiredEnv("DISCORDBOTTOKEN");
+        final var goatsWebhookUrl = getRequiredEnv("GOATS_WEBHOOK_URL");
+        final var goatsChannelId = getRequiredEnv("GOATS_CHANNEL_ID");
 
         final var dedupeTable = Table.Builder.create(this, "DedupeTable")
             .tableName("DedupeTable")
@@ -59,10 +44,23 @@ public class HockeyDiscordBotStack extends Stack {
             .billingMode(BillingMode.PAY_PER_REQUEST)
             .build();
 
-        final var ddbFullAccessPermissions = new PolicyStatement();
-        ddbFullAccessPermissions.addActions("dynamodb:*");
-        ddbFullAccessPermissions.addResources("*");
-        hockeyScheduleBotFunction.addToRolePolicy(ddbFullAccessPermissions);
+        final var hockeyScheduleBotFunction = Function.Builder.create(this, "HockeyScheduleBot")
+            .functionName("HockeyScheduleBot")
+            .runtime(Runtime.JAVA_21)
+            .memorySize(256)
+            .timeout(hockeyScheduleBotTimeout)
+            .code(new AssetCode(MAVEN_ASSET_CODE_PATH))
+            .handler("lambda.ScheduleBotRequestHandler::handleRequest")
+            .architecture(Architecture.ARM_64)
+            .environment(Map.of(
+                "DISCORDBOTTOKEN", discordBotToken,
+                "GOATS_WEBHOOK_URL", goatsWebhookUrl,
+                "GOATS_CHANNEL_ID", goatsChannelId
+            ))
+            .build();
+
+        // Grant scoped read/write permissions to the DynamoDB table
+        dedupeTable.grantReadWriteData(hockeyScheduleBotFunction);
 
         final var scheduleRole = Role.Builder.create(this, "ScheduleRole")
             .managedPolicies(List.of(ManagedPolicy.fromManagedPolicyArn(this, "scheduleManagedPolicy", "arn:aws:iam::aws:policy/service-role/AWSLambdaRole")))
@@ -80,5 +78,13 @@ public class HockeyDiscordBotStack extends Stack {
                     .roleArn(scheduleRole.getRoleArn())
                     .build()
             ).build();
+    }
+
+    private String getRequiredEnv(String name) {
+        final var value = System.getenv(name);
+        if (value == null || value.isEmpty()) {
+            throw new RuntimeException(name + " environment variable must be set");
+        }
+        return value;
     }
 }
