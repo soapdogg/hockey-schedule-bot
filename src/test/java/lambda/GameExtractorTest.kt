@@ -226,6 +226,55 @@ class GameExtractorTest {
     }
 
     @Test
+    fun `extractGames captures gameId, result, and score for completed games`() {
+        val mockHttpClient = mockk<HttpClient>()
+        val htmlSchedule = """
+            <html>
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td>Mon, May 11</td>
+                            <td>7:45 PM</td>
+                            <td>KVIC</td>
+                            <td>AWAY</td>
+                            <td><a href="/team/17768/home">Dirty Couch Hockey Club</a></td>
+                            <td><span>L</span></td>
+                            <td>8 - 2</td>
+                            <td><a href="/game/55483/summary">Final</a></td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td>Thu, May 14</td>
+                            <td>8:30 PM</td>
+                            <td>LIC</td>
+                            <td>HOME</td>
+                            <td><a href="/team/12345/home">Some Future Opponent</a></td>
+                            <td></td>
+                            <td></td>
+                            <td>TONIGHT</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </html>
+        """.trimIndent()
+
+        val team = Team("TestTeam", "10159", "webhook", "channelId")
+        every { mockHttpClient.executeHttpGetRequest(any()) } returns htmlSchedule
+
+        val games = GameExtractor(mockHttpClient).extractGames(team)
+
+        assertEquals(2, games.size)
+        assertEquals("55483", games[0].gameId)
+        assertEquals("L", games[0].result)
+        assertEquals("8 - 2", games[0].score)
+
+        assertEquals(null, games[1].gameId)
+        assertEquals(null, games[1].result)
+        assertEquals(null, games[1].score)
+    }
+
+    @Test
     fun `extractGames uses correct URL for team`() {
         val mockHttpClient = mockk<HttpClient>()
         val urlSlot = slot<String>()

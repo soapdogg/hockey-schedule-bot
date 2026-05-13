@@ -5,18 +5,29 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
-import java.time.Month
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class ScheduleBotRequestHandler() {
 
     fun handleRequest() {
         println("=== Hockey Schedule Bot Lambda Starting ===")
         println("Bot token available: ${if (Fixtures.BOT_TOKEN.isNotEmpty()) "Yes" else "No"}")
-        val httpClient = HttpClient(OkHttpClient())
+        val okHttp = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(60, TimeUnit.SECONDS)
+            .addInterceptor { chain ->
+                val req = chain.request().newBuilder()
+                    .header("User-Agent", Fixtures.HTTP_USER_AGENT)
+                    .build()
+                chain.proceed(req)
+            }
+            .build()
+        val httpClient = HttpClient(okHttp)
         val gameExtractor = GameExtractor(httpClient)
+        val gameSummaryExtractor = GameSummaryExtractor(httpClient)
         val database = Database(DynamoDbClient.create())
         val teams = listOf(
             Team("Reindeer5D", "10159", Fixtures.GOATS_CHANNEL, Fixtures.GOATS_CHANNEL_ID),
@@ -26,6 +37,7 @@ class ScheduleBotRequestHandler() {
         println("Current time (PST): $now")
         println("Processing ${teams.size} team(s)")
 
+        val failures = mutableListOf<String>()
         teams.forEach { team ->
             try {
                 println("\n--- Processing team: ${team.name} ---")
@@ -56,19 +68,10 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
 
                             httpClient.executeHttpPostRequest(team.webhookChannel, content)
 
-
-                            val year = if(now.month == Month.DECEMBER && game.date.contains("JAN")) now.year  + 1 else now.year
-
-                            val gameDateStringWithYear = dateString.replace(" @", " $year @")
-
-                            val formatter = DateTimeFormatter.ofPattern(Fixtures.GAME_DATE_TIME_PATTERN)
-                                .withLocale(Locale.ENGLISH)
-
-                            val gameLocalDateTime = LocalDateTime.parse(gameDateStringWithYear, formatter)
+                            val gameLocalDateTime = GameDateParser.parse(now, dateString)
 
                             val pollExpiration = (Duration.between(now, gameLocalDateTime).seconds / (60 * 60)) - 1
 
-                            println("Game date/time: $gameDateStringWithYear")
                             println("Current time: $now")
                             println("Game local date time: $gameLocalDateTime")
                             println("Calculated poll expiration: $pollExpiration hours")
@@ -98,6 +101,35 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
                                 game.hash
                             )
                         }
+
+                        if (game.gameId != null) {
+                            val recapKey = game.hash + Fixtures.RECAP_RANGE_SUFFIX
+                            val recapAlreadyPublished = database.hasItem(
+                                Fixtures.DEDUPE_TABLE_NAME,
+                                Fixtures.TEAM_ATTRIBUTE_NAME,
+                                Fixtures.GAME_ID_ATTRIBUTE_NAME,
+                                team.name,
+                                recapKey,
+                            )
+                            if (!recapAlreadyPublished) {
+                                println("Checking recap readiness for game ${game.gameId}...")
+                                val recap = gameSummaryExtractor.fetchIfReady(game.gameId)
+                                if (recap == null) {
+                                    println("Recap not ready yet for game ${game.gameId}; will retry next run.")
+                                } else {
+                                    println("Recap ready: ${recap.goals.size} goal(s), ${recap.penalties.size} penalty/ies.")
+                                    val messages = RecapFormatter.format(game, recap)
+                                    messages.forEach { httpClient.executeHttpPostRequest(team.webhookChannel, it) }
+                                    database.putItem(
+                                        Fixtures.DEDUPE_TABLE_NAME,
+                                        Fixtures.TEAM_ATTRIBUTE_NAME,
+                                        Fixtures.GAME_ID_ATTRIBUTE_NAME,
+                                        team.name,
+                                        recapKey,
+                                    )
+                                }
+                            }
+                        }
                     } catch (e: Exception) {
                         println("ERROR: Failed to process game #${game.number} for team ${team.name}: ${e.message}")
                         e.printStackTrace()
@@ -106,7 +138,22 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
             } catch (e: Exception) {
                 println("ERROR: Failed to process team ${team.name}: ${e.message}")
                 e.printStackTrace()
+                failures += "${team.name}: ${e.javaClass.simpleName}: ${e.message?.take(200)}"
             }
+        }
+
+        if (failures.isNotEmpty()) {
+            val alertUrl = Fixtures.ALERT_WEBHOOK_URL
+            if (alertUrl.isNotEmpty()) {
+                try {
+                    val content = ":rotating_light: Hockey bot run failed for ${failures.size} team(s):\n" +
+                        failures.joinToString("\n") { "- $it" }
+                    httpClient.executeHttpPostRequest(alertUrl, content)
+                } catch (e: Exception) {
+                    println("ERROR: Failed to publish alert webhook: ${e.message}")
+                }
+            }
+            throw RuntimeException("Hockey bot run failed for ${failures.size} team(s): $failures")
         }
     }
 }

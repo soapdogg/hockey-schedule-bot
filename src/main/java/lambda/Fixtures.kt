@@ -24,8 +24,14 @@ object Fixtures {
     const val TEAM_ATTRIBUTE_NAME = "team"
     const val GAME_ID_ATTRIBUTE_NAME = "game-id"
 
+    const val RECAP_RANGE_SUFFIX = ":recap"
+
+    const val HTTP_USER_AGENT = "hockey-schedule-bot/1.0 (+https://github.com/soapdogg/hockey-schedule-bot)"
+
     val GOATS_CHANNEL: String = System.getenv("GOATS_WEBHOOK_URL") ?: ""
     val GOATS_CHANNEL_ID: String = System.getenv("GOATS_CHANNEL_ID") ?: ""
 
     val BOT_TOKEN: String = System.getenv("DISCORDBOTTOKEN") ?: ""
+
+    val ALERT_WEBHOOK_URL: String = System.getenv("ALERT_WEBHOOK_URL") ?: GOATS_CHANNEL
 }

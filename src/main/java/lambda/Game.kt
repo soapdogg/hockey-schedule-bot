@@ -9,4 +9,7 @@ data class Game(
     val opponent: String,
     val opponentLink: String,
     val hash: String,
+    val gameId: String? = null,
+    val result: String? = null,
+    val score: String? = null,
 )
