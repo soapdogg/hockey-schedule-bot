@@ -5,10 +5,14 @@ import java.util.Locale
 object RecapFormatter {
     private const val DISCORD_MAX_CHARS = 1900
 
-    fun format(game: Game, recap: Recap, season: SeasonContext? = null): List<String> {
-        val lines = buildLines(game, recap) + (season?.let { seasonLines(it) } ?: emptyList())
+    fun format(game: Game, recap: Recap, season: SeasonContext? = null, insight: String? = null): List<String> {
+        val lines = buildLines(game, recap) +
+            (season?.let { seasonLines(it) } ?: emptyList()) +
+            (insight?.let { listOf("", insightLine(it)) } ?: emptyList())
         return chunk(lines, DISCORD_MAX_CHARS)
     }
+
+    fun insightLine(insight: String): String = "📊 $insight"
 
     private fun buildLines(game: Game, recap: Recap): List<String> {
         val out = mutableListOf<String>()

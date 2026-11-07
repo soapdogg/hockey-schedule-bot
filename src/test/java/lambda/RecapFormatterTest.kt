@@ -78,6 +78,14 @@ class RecapFormatterTest {
     }
 
     @Test
+    fun `ends with the insight when there is one`() {
+        val msgs = RecapFormatter.format(baseGame, typicalRecap, insight = "We scored first in this one.")
+        assertEquals(1, msgs.size)
+        assertTrue(msgs[0].endsWith("\n\n📊 We scored first in this one."), msgs[0])
+        assertTrue(RecapFormatter.format(baseGame, typicalRecap).none { "📊" in it })
+    }
+
+    @Test
     fun `teamTag abbreviates names sensibly`() {
         assertEquals("DCH", RecapFormatter.teamTag("Dirty Couch Hockey Club"))
         assertEquals("RRH", RecapFormatter.teamTag("Rainier Reindeer HC-6"))

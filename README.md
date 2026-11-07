@@ -21,6 +21,7 @@ Hockey Schedule Bot is an automated Discord bot built with AWS CDK, Kotlin, and 
 - **Discord Integration**: Posts game announcements with formatted messages and interactive polls
 - **Game Deduplication**: Uses DynamoDB to track previously published games and avoid duplicates
 - **Game Archive**: Stores every completed game's full scoresheet (both teams) and official result in DynamoDB, as the basis for analytics
+- **Stat Insights**: Adds one stat insight to each game announcement and recap, such as the team's record when it scores first or a milestone a player is about to reach, plus a midweek post when something stands out
 - **Interactive Polls**: Creates Discord polls asking team members about their availability for games
 - **Arena Location Links**: Provides Google Maps links for all arena locations
 - **AWS Lambda Deployment**: Serverless architecture using AWS Lambda for scalability and cost-efficiency
@@ -30,7 +31,7 @@ Hockey Schedule Bot is an automated Discord bot built with AWS CDK, Kotlin, and 
 The application is deployed as an AWS Lambda function orchestrated by AWS CDK:
 
 - **Lambda Function**: Kotlin-based handler that processes game schedules
-- **DynamoDB Tables**: `DedupeTable` stores published game IDs to prevent duplicate announcements; `GameArchive` stores completed games (kept if the stack is deleted)
+- **DynamoDB Tables**: `DedupeTable` stores published game IDs to prevent duplicate announcements; `GameArchive` stores completed games (kept if the stack is deleted); `InsightLog` records posted insights so they don't repeat
 - **EventBridge Schedule**: Triggers the Lambda function at 9 AM and 8 PM Pacific Time
 - **Discord Webhooks**: Posts messages to Discord channels
 - **Discord Bot API**: Creates interactive polls for game attendance
@@ -172,6 +173,28 @@ AWS_REGION=<stack region> java -cp "target/classes:$(cat cp.txt)" lambda.Histori
 
 It's safe to re-run. Use `--jsonl games.jsonl` instead of `--table` for a dry run that writes the
 same JSON to a local file, and `--season <id>` to limit it to particular seasons.
+
+### Stat Insights
+
+Insights come from the game archive. Each run, the bot compares the team's record in games where
+something was true against games where it wasn't: shots, power plays, scoring first, penalties,
+bench size, venue, day of the week, start time, home or away, time off, and each current player
+in or out of the lineup. A comparison is only used if it passes a permutation test after a
+false-discovery-rate correction across all comparisons, so chance patterns aren't posted.
+Milestones, assist pairs and head-to-head records are added alongside.
+
+From those, the bot picks one at random among the strongest few, skipping anything posted
+recently: the same fact within 60 days, the same kind of insight within 14 days, or the same
+player within 21 days. Players are only mentioned favourably.
+
+To see everything the engine finds, with its statistics, without posting or logging anything:
+
+```bash
+AWS_REGION=<stack region> java -cp "target/classes:$(cat cp.txt)" lambda.InsightDryRun --team-id 10159
+```
+
+Add `--jsonl games.jsonl` to read a file from `HistoricalScraper --jsonl` instead of DynamoDB, and
+`--post 3` to post three sample insights to `GOATS_WEBHOOK_URL`.
 
 ## Project Structure
 

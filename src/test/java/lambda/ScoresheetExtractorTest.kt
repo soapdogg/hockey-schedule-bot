@@ -109,6 +109,18 @@ class ScoresheetExtractorTest {
     }
 
     @Test
+    fun `ignores the per-period scoring and shots tables after the penalties`() {
+        val parsed = parseFixture("scoresheet_57278.html")
+        val home = assertNotNull(parsed.home)
+        val away = assertNotNull(parsed.away)
+
+        assertEquals(listOf("5:41", "15:47", "7:00"), home.penalties.map { it.time })
+        assertEquals(listOf("Interferenc", "Tripping", "Roughing"), home.penalties.map { it.infraction })
+        assertEquals(listOf("5:41", "7:00"), away.penalties.map { it.time })
+        assertTrue((home.penalties + away.penalties).all { it.minutes == "2" })
+    }
+
+    @Test
     fun `returns empty sides when section markers are missing`() {
         val html = """<html><body><table><tr><td>nothing here</td></tr></table></body></html>"""
         val parsed = ScoresheetExtractor(mockk()).parse(Jsoup.parse(html))

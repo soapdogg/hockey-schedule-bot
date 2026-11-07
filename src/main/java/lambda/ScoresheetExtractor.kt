@@ -128,7 +128,9 @@ class ScoresheetExtractor(
                     }
                 }
                 Section.PENALTY -> {
-                    if (cells.size == 6 && cells != PENALTY_HEADER) {
+                    // The per-period scoring and shots tables further down also have six columns,
+                    // so a penalty row must have a game-clock time.
+                    if (cells.size == 6 && cells != PENALTY_HEADER && CLOCK_TIME.matches(cells[2])) {
                         val period = cells[1]
                         val time = cells[2]
                         val playerJ = cells[3]
@@ -196,6 +198,7 @@ class ScoresheetExtractor(
         private val SCORING_HEADER = listOf("No", "Per", "Time", "Goal", "Assist", "", "Assist", "Type")
         private val PENALTY_HEADER = listOf("No", "Per", "Time", "#", "Infraction", "Min")
         private val GOALIE_HEADER = listOf("Name", "Mins", "GA", "SA", "SV")
+        private val CLOCK_TIME = Regex("\\d{1,2}:\\d{2}")
         private val TITLE_DATE = Regex("Scoresheet - ([A-Z][a-z]{2} \\d{1,2}, \\d{4})")
         private val TITLE_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM d, uuuu", Locale.ENGLISH)
     }

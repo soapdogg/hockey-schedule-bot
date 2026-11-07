@@ -55,6 +55,15 @@ public class HockeyDiscordBotStack extends Stack {
             .removalPolicy(RemovalPolicy.RETAIN)
             .build();
 
+        // Insights the bot has posted, for cooldowns. Entries expire after a year.
+        final var insightLogTable = Table.Builder.create(this, "InsightLog")
+            .tableName("InsightLog")
+            .partitionKey(Attribute.builder().name("team").type(AttributeType.STRING).build())
+            .sortKey(Attribute.builder().name("posted-at").type(AttributeType.STRING).build())
+            .timeToLiveAttribute("ttl")
+            .billingMode(BillingMode.PAY_PER_REQUEST)
+            .build();
+
         final var hockeyScheduleBotFunction = Function.Builder.create(this, "HockeyScheduleBot")
             .functionName("HockeyScheduleBot")
             .runtime(Runtime.JAVA_21)
@@ -73,6 +82,7 @@ public class HockeyDiscordBotStack extends Stack {
         // Grant scoped read/write permissions to the DynamoDB table
         dedupeTable.grantReadWriteData(hockeyScheduleBotFunction);
         gameArchiveTable.grantReadWriteData(hockeyScheduleBotFunction);
+        insightLogTable.grantReadWriteData(hockeyScheduleBotFunction);
 
         final var scheduleRole = Role.Builder.create(this, "ScheduleRole")
             .managedPolicies(List.of(ManagedPolicy.fromManagedPolicyArn(this, "scheduleManagedPolicy", "arn:aws:iam::aws:policy/service-role/AWSLambdaRole")))

@@ -31,11 +31,13 @@ class ScheduleBotRequestHandler() {
         val teamStatsExtractor = TeamStatsExtractor(httpClient)
         val dynamoDb = DynamoDbClient.create()
         val database = Database(dynamoDb)
+        val gameArchive = GameArchive(dynamoDb)
         val gameArchiver = GameArchiver(
             ScoresheetExtractor(httpClient),
             SeasonDiscoverer(httpClient),
-            GameArchive(dynamoDb),
+            gameArchive,
         )
+        val insights = InsightService(gameArchive, InsightLog(dynamoDb))
         val teams = listOf(
             Team("Reindeer5D", "10159", Fixtures.GOATS_CHANNEL, Fixtures.GOATS_CHANNEL_ID),
         )
@@ -51,6 +53,18 @@ class ScheduleBotRequestHandler() {
 
                 val games = gameExtractor.extractGames(team)
                 println("Found ${games.size} game(s) for team ${team.name}")
+
+                // Archive first, so a recap's insight can include the game just played. Archiving
+                // feeds analytics only, so a failure here shouldn't fail the run.
+                try {
+                    val archived = gameArchiver.archiveNewGames(team, games)
+                    if (archived > 0) println("Archived $archived new game(s) for ${team.name}")
+                } catch (e: Exception) {
+                    println("WARNING: Failed to archive games for ${team.name}: ${e.message}")
+                    e.printStackTrace()
+                }
+
+                var preGameInsightPosted = false
                 val seasonContext by lazy { buildSeasonContext(teamStatsExtractor, team, games) }
                 games.forEach { game ->
                     try {
@@ -69,12 +83,24 @@ class ScheduleBotRequestHandler() {
                             println("Publishing new game announcement...")
                             val arenaLink = Fixtures.ARENAS_TO_LOCATION.getValue(game.arena)
                             val dateString = game.date + " @ " + game.time
+                            // One insight per run at most, and only for games coming up soon.
+                            val start = runCatching { GameDateParser.parse(now, dateString) }.getOrNull()
+                            val preGame = Occasion.PreGame(game.opponent, game.arena, start, game.ha)
+                            val insight = if (!preGameInsightPosted && start != null && Duration.between(now, start) <= InsightService.PRE_GAME_HORIZON) {
+                                insights.pick(team, preGame)
+                            } else {
+                                null
+                            }
                             val content = """
 Game #${game.number} of the season is on **$dateString**.
 We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent}](${Fixtures.KRAKEN_HOCKEY_LEAGUE_WEBSITE}${game.opponentLink} ). We are the ${game.ha} team.
-""".trimIndent()
+""".trimIndent() + (insight?.let { "\n" + RecapFormatter.insightLine(it.text) } ?: "")
 
                             httpClient.executeHttpPostRequest(team.webhookChannel, content)
+                            if (insight != null) {
+                                preGameInsightPosted = true
+                                insights.recordPosted(team, insight, preGame)
+                            }
 
                             val gameLocalDateTime = GameDateParser.parse(now, dateString)
 
@@ -126,8 +152,11 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
                                     println("Recap not ready yet for game ${game.gameId}; will retry next run.")
                                 } else {
                                     println("Recap ready: ${recap.goals.size} goal(s), ${recap.penalties.size} penalty/ies.")
-                                    val messages = RecapFormatter.format(game, recap, seasonContext)
+                                    val occasion = Occasion.Recap(game.gameId)
+                                    val insight = insights.pick(team, occasion)
+                                    val messages = RecapFormatter.format(game, recap, seasonContext, insight?.text)
                                     messages.forEach { httpClient.executeHttpPostRequest(team.webhookChannel, it) }
+                                    insight?.let { insights.recordPosted(team, it, occasion) }
                                     database.putItem(
                                         Fixtures.DEDUPE_TABLE_NAME,
                                         Fixtures.TEAM_ATTRIBUTE_NAME,
@@ -144,13 +173,17 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
                     }
                 }
 
-                // Archiving feeds analytics only, so a failure here shouldn't fail the run.
-                try {
-                    val archived = gameArchiver.archiveNewGames(team, games)
-                    if (archived > 0) println("Archived $archived new game(s) for ${team.name}")
-                } catch (e: Exception) {
-                    println("WARNING: Failed to archive games for ${team.name}: ${e.message}")
-                    e.printStackTrace()
+                // A post of its own between games, only when there's something strong to say.
+                if (InsightService.isMidweekRun(now)) {
+                    try {
+                        insights.pick(team, Occasion.Midweek)?.let { insight ->
+                            println("Posting midweek insight ${insight.key}")
+                            httpClient.executeHttpPostRequest(team.webhookChannel, RecapFormatter.insightLine(insight.text))
+                            insights.recordPosted(team, insight, Occasion.Midweek)
+                        }
+                    } catch (e: Exception) {
+                        println("WARNING: Failed to post midweek insight for ${team.name}: ${e.message}")
+                    }
                 }
             } catch (e: Exception) {
                 println("ERROR: Failed to process team ${team.name}: ${e.message}")

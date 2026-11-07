@@ -22,6 +22,7 @@ object Fixtures {
 
     const val DEDUPE_TABLE_NAME = "DedupeTable"
     const val GAME_ARCHIVE_TABLE_NAME = "GameArchive"
+    const val INSIGHT_LOG_TABLE_NAME = "InsightLog"
     const val TEAM_ATTRIBUTE_NAME = "team"
     const val GAME_ID_ATTRIBUTE_NAME = "game-id"
 
