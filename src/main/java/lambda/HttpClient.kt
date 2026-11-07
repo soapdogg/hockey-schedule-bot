@@ -51,7 +51,8 @@ class HttpClient(
                 }
             }
         } catch (e: Exception) {
-            println("ERROR: Webhook POST request failed for $url: ${e.message}")
+            // The URL contains the webhook token, so only log its host.
+            println("ERROR: Webhook POST request failed for ${request.url.host}: ${e.message}")
             throw e
         }
     }

@@ -9,6 +9,9 @@ import okio.Buffer
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.AfterEach
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class HttpClientTest {
 
@@ -78,6 +81,29 @@ class HttpClientTest {
         assertEquals("POST", capturedRequest.method)
         assertEquals("http://webhook.com/", capturedRequest.url.toString())
         verify(exactly = 1) { mockCall.execute() }
+    }
+
+    @Test
+    fun `a failed webhook POST does not log the webhook token`() {
+        val mockOkHttpClient = mockk<OkHttpClient>()
+        val mockCall = mockk<okhttp3.Call>()
+        every { mockCall.execute() } throws java.io.IOException("timeout")
+        every { mockOkHttpClient.newCall(any()) } returns mockCall
+
+        val out = java.io.ByteArrayOutputStream()
+        val originalOut = System.out
+        System.setOut(java.io.PrintStream(out, true))
+        try {
+            assertFailsWith<java.io.IOException> {
+                HttpClient(mockOkHttpClient).executeHttpPostRequest("https://discord.com/api/webhooks/123/secret-token", "hi")
+            }
+        } finally {
+            System.setOut(originalOut)
+        }
+
+        val logged = out.toString()
+        assertTrue(logged.contains("discord.com"), logged)
+        assertFalse(logged.contains("secret-token"), logged)
     }
 
     @Test
