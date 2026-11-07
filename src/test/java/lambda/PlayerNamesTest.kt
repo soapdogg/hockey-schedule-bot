@@ -11,5 +11,6 @@ class PlayerNamesTest {
         assertEquals("Mary-Jane O'Neil", PlayerNames.display("MARY-JANE O'NEIL"))
         assertEquals("Eric McDonald", PlayerNames.display("Eric McDonald"))
         assertEquals("Chris Flynn", PlayerNames.display("  Chris   Flynn "))
+        assertEquals("Andrew Girovyi", PlayerNames.display("ANDREW GIROVYI**"))
     }
 }

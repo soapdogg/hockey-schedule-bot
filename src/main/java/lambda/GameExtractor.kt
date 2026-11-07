@@ -6,8 +6,9 @@ class GameExtractor(
     private val httpClient: HttpClient,
 ) {
 
-    fun extractGames(team: Team): List<Game> {
-        val scheduleUrl = "${Fixtures.KRAKEN_HOCKEY_LEAGUE_WEBSITE}/team/${team.krakenWebsiteId}/schedule/"
+    fun extractGames(team: Team, season: String? = null): List<Game> {
+        val base = "${Fixtures.KRAKEN_HOCKEY_LEAGUE_WEBSITE}/team/${team.krakenWebsiteId}/schedule/"
+        val scheduleUrl = if (season.isNullOrBlank()) base else "$base?season=$season"
         val schedule = httpClient.executeHttpGetRequest(scheduleUrl)
         val doc = Jsoup.parse(schedule)
         val games = mutableListOf<Game>()

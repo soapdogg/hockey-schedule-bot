@@ -20,6 +20,7 @@ Hockey Schedule Bot is an automated Discord bot built with AWS CDK, Kotlin, and 
 - **Game Recaps**: After a game, posts the final score, scoring, penalties, shots and saves, plus the season record, points leaders and goalie stats. Only games from the last 3 days are recapped.
 - **Discord Integration**: Posts game announcements with formatted messages and interactive polls
 - **Game Deduplication**: Uses DynamoDB to track previously published games and avoid duplicates
+- **Game Archive**: Stores every completed game's full scoresheet (both teams) and official result in DynamoDB, as the basis for analytics
 - **Interactive Polls**: Creates Discord polls asking team members about their availability for games
 - **Arena Location Links**: Provides Google Maps links for all arena locations
 - **AWS Lambda Deployment**: Serverless architecture using AWS Lambda for scalability and cost-efficiency
@@ -29,7 +30,7 @@ Hockey Schedule Bot is an automated Discord bot built with AWS CDK, Kotlin, and 
 The application is deployed as an AWS Lambda function orchestrated by AWS CDK:
 
 - **Lambda Function**: Kotlin-based handler that processes game schedules
-- **DynamoDB Table**: Stores published game IDs to prevent duplicate announcements
+- **DynamoDB Tables**: `DedupeTable` stores published game IDs to prevent duplicate announcements; `GameArchive` stores completed games (kept if the stack is deleted)
 - **EventBridge Schedule**: Triggers the Lambda function at 9 AM and 8 PM Pacific Time
 - **Discord Webhooks**: Posts messages to Discord channels
 - **Discord Bot API**: Creates interactive polls for game attendance
@@ -157,6 +158,19 @@ val teams = listOf(
     Team("TeamName", "teamId", "webhookUrl", "channelId"),
 )
 ```
+
+### Backfilling Game History
+
+The Lambda archives new games as they're played. To load past seasons once, run the scraper
+with AWS credentials for the account (it uses your default credentials and region):
+
+```bash
+mvn -q compile dependency:build-classpath -Dmdep.outputFile=cp.txt
+java -cp "target/classes:$(cat cp.txt)" lambda.HistoricalScraper --team-id 10159 --table GameArchive
+```
+
+It's safe to re-run. Use `--jsonl games.jsonl` instead of `--table` for a dry run that writes the
+same JSON to a local file, and `--season <id>` to limit it to particular seasons.
 
 ## Project Structure
 

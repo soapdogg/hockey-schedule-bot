@@ -29,7 +29,13 @@ class ScheduleBotRequestHandler() {
         val gameExtractor = GameExtractor(httpClient)
         val gameSummaryExtractor = GameSummaryExtractor(httpClient)
         val teamStatsExtractor = TeamStatsExtractor(httpClient)
-        val database = Database(DynamoDbClient.create())
+        val dynamoDb = DynamoDbClient.create()
+        val database = Database(dynamoDb)
+        val gameArchiver = GameArchiver(
+            ScoresheetExtractor(httpClient),
+            SeasonDiscoverer(httpClient),
+            GameArchive(dynamoDb),
+        )
         val teams = listOf(
             Team("Reindeer5D", "10159", Fixtures.GOATS_CHANNEL, Fixtures.GOATS_CHANNEL_ID),
         )
@@ -136,6 +142,15 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
                         println("ERROR: Failed to process game #${game.number} for team ${team.name}: ${e.message}")
                         e.printStackTrace()
                     }
+                }
+
+                // Archiving feeds analytics only, so a failure here shouldn't fail the run.
+                try {
+                    val archived = gameArchiver.archiveNewGames(team, games)
+                    if (archived > 0) println("Archived $archived new game(s) for ${team.name}")
+                } catch (e: Exception) {
+                    println("WARNING: Failed to archive games for ${team.name}: ${e.message}")
+                    e.printStackTrace()
                 }
             } catch (e: Exception) {
                 println("ERROR: Failed to process team ${team.name}: ${e.message}")

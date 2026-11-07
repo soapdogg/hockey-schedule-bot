@@ -1,6 +1,7 @@
 package com.myorg;
 
 import software.amazon.awscdk.Duration;
+import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.services.dynamodb.Attribute;
 import software.amazon.awscdk.services.dynamodb.AttributeType;
 import software.amazon.awscdk.services.dynamodb.BillingMode;
@@ -44,6 +45,16 @@ public class HockeyDiscordBotStack extends Stack {
             .billingMode(BillingMode.PAY_PER_REQUEST)
             .build();
 
+        // Every completed game, for analytics. Kept if the stack is deleted, since rebuilding it
+        // means re-scraping years of league history.
+        final var gameArchiveTable = Table.Builder.create(this, "GameArchive")
+            .tableName("GameArchive")
+            .partitionKey(Attribute.builder().name("team").type(AttributeType.STRING).build())
+            .sortKey(Attribute.builder().name("game-id").type(AttributeType.STRING).build())
+            .billingMode(BillingMode.PAY_PER_REQUEST)
+            .removalPolicy(RemovalPolicy.RETAIN)
+            .build();
+
         final var hockeyScheduleBotFunction = Function.Builder.create(this, "HockeyScheduleBot")
             .functionName("HockeyScheduleBot")
             .runtime(Runtime.JAVA_21)
@@ -61,6 +72,7 @@ public class HockeyDiscordBotStack extends Stack {
 
         // Grant scoped read/write permissions to the DynamoDB table
         dedupeTable.grantReadWriteData(hockeyScheduleBotFunction);
+        gameArchiveTable.grantReadWriteData(hockeyScheduleBotFunction);
 
         final var scheduleRole = Role.Builder.create(this, "ScheduleRole")
             .managedPolicies(List.of(ManagedPolicy.fromManagedPolicyArn(this, "scheduleManagedPolicy", "arn:aws:iam::aws:policy/service-role/AWSLambdaRole")))
