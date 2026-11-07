@@ -162,11 +162,12 @@ val teams = listOf(
 ### Backfilling Game History
 
 The Lambda archives new games as they're played. To load past seasons once, run the scraper
-with AWS credentials for the account (it uses your default credentials and region):
+with AWS credentials for the account. Set `AWS_REGION` to the region the stack is deployed in
+(the `AWS_REGION` repository secret), since the scraper otherwise uses your default region:
 
 ```bash
 mvn -q compile dependency:build-classpath -Dmdep.outputFile=cp.txt
-java -cp "target/classes:$(cat cp.txt)" lambda.HistoricalScraper --team-id 10159 --table GameArchive
+AWS_REGION=<stack region> java -cp "target/classes:$(cat cp.txt)" lambda.HistoricalScraper --team-id 10159 --table GameArchive
 ```
 
 It's safe to re-run. Use `--jsonl games.jsonl` instead of `--table` for a dry run that writes the
