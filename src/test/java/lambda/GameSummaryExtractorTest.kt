@@ -90,4 +90,44 @@ class GameSummaryExtractorTest {
         assertTrue(urlSlot.captured.endsWith("/game/12345/summary"))
         assertTrue(urlSlot.captured.startsWith(Fixtures.KRAKEN_HOCKEY_LEAGUE_WEBSITE))
     }
+
+    @Test
+    fun `parses the current page layout, including goal type badges`() {
+        val html = loadFixture("/fixtures/game_57309_summary.html")
+        val recap = GameSummaryExtractor(mockk()).parseIfReady(Jsoup.parse(html))
+
+        assertNotNull(recap)
+        assertEquals(listOf(5, 4), recap.teams.map { it.total })
+        assertEquals(9, recap.goals.size)
+        assertEquals(
+            Recap.Goal("1ST PERIOD", "5:08", "Rainier Reindeer HC-6B", "Phantasia Jerdro", listOf("Dzucka Lin")),
+            recap.goals.first(),
+        )
+        val powerPlayGoal = recap.goals.single { it.type != null }
+        assertEquals("Jazz Palley", powerPlayGoal.scorer)
+        assertEquals("PPG", powerPlayGoal.type)
+        assertEquals("0:04", powerPlayGoal.time)
+        assertEquals(listOf("Diviyan Matheendran", "Jazz Palley"), recap.goals.single { it.scorer == "Chris Flynn" }.assists)
+        assertEquals(5, recap.penalties.size)
+    }
+
+    @Test
+    fun `accepts shootout games, whose final score includes the shootout winner`() {
+        val html = loadFixture("/fixtures/game_56621_summary.html")
+        val recap = GameSummaryExtractor(mockk()).parseIfReady(Jsoup.parse(html))
+
+        assertNotNull(recap)
+        assertEquals(listOf(3, 2), recap.teams.map { it.total })
+        assertEquals(4, recap.goals.size)
+    }
+
+    @Test
+    fun `returns null when parsed goals do not add up to the scoring table`() {
+        val doc = Jsoup.parse(loadFixture("/fixtures/game_57309_summary.html"))
+        doc.select("h1").first { it.text().trim() == "SCORING SUMMARY" }
+            .nextElementSiblings()
+            .first { it.hasClass("row") && it.hasClass("mb-3") }
+            .remove()
+        assertNull(GameSummaryExtractor(mockk()).parseIfReady(doc))
+    }
 }

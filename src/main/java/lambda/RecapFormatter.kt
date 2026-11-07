@@ -1,10 +1,12 @@
 package lambda
 
+import java.util.Locale
+
 object RecapFormatter {
     private const val DISCORD_MAX_CHARS = 1900
 
-    fun format(game: Game, recap: Recap): List<String> {
-        val lines = buildLines(game, recap)
+    fun format(game: Game, recap: Recap, season: SeasonContext? = null): List<String> {
+        val lines = buildLines(game, recap) + (season?.let { seasonLines(it) } ?: emptyList())
         return chunk(lines, DISCORD_MAX_CHARS)
     }
 
@@ -17,6 +19,7 @@ object RecapFormatter {
         if (recap.shots.size == 2) {
             out += "Shots: ${recap.shots[0].name} ${recap.shots[0].total}, ${recap.shots[1].name} ${recap.shots[1].total}"
         }
+        goaltendingLine(game, recap)?.let { out += it }
 
         out += ""
         out += "**Scoring**"
@@ -31,7 +34,8 @@ object RecapFormatter {
                     lastPeriod = g.period
                 }
                 val assistText = if (g.assists.isEmpty()) "unassisted" else g.assists.joinToString(", ")
-                out += "• ${g.time} — ${g.scorer} (${teamTag(g.team)}) — $assistText"
+                val tag = listOfNotNull(teamTag(g.team), g.type).joinToString(", ")
+                out += "• ${g.time} — ${g.scorer} ($tag) — $assistText"
             }
         }
 
@@ -46,6 +50,49 @@ object RecapFormatter {
             }
         }
         return out
+    }
+
+    /**
+     * Our goalie's saves: the opponent's shots minus the opponent's goals. Skipped for shootout
+     * results, because the final score then includes a shootout goal that wasn't a shot.
+     */
+    internal fun goaltendingLine(game: Game, recap: Recap): String? {
+        if (game.result?.trim()?.uppercase()?.startsWith("SO") == true) return null
+        val opponentGoals = recap.teams.firstOrNull { sameTeam(it.name, game.opponent) }?.total ?: return null
+        val opponentShots = recap.shots.firstOrNull { sameTeam(it.name, game.opponent) }?.total ?: return null
+        val saves = opponentShots - opponentGoals
+        if (opponentShots <= 0 || saves < 0) return null
+        val pct = String.format(Locale.US, "%.3f", saves.toDouble() / opponentShots).removePrefix("0")
+        return "Goaltending: $saves saves on $opponentShots shots ($pct)"
+    }
+
+    private fun seasonLines(season: SeasonContext): List<String> {
+        val lines = mutableListOf<String>()
+        season.record?.let { lines += "Record: $it" }
+        season.stats?.let { stats ->
+            val leaders = stats.skaters
+                .filter { it.points > 0 }
+                .sortedWith(compareByDescending<TeamStats.Skater> { it.points }.thenByDescending { it.goals })
+                .take(Fixtures.RECAP_TOP_SCORERS)
+            if (leaders.isNotEmpty()) {
+                lines += "Points: " + leaders.joinToString(" · ") { "${it.name} ${it.points} (${it.goals}G, ${it.assists}A)" }
+            }
+            val goalies = stats.goalies.filter { it.gamesPlayed > 0 }.sortedByDescending { it.gamesPlayed }
+            if (goalies.isNotEmpty()) {
+                val label = if (goalies.size == 1) "Goalie" else "Goalies"
+                lines += "$label: " + goalies.joinToString(" · ") { g ->
+                    val shutouts = if (g.shutouts > 0) ", ${g.shutouts} SO" else ""
+                    "${g.name} ${g.savePercentage} SV%, ${g.goalsAgainstAverage} GAA$shutouts"
+                }
+            }
+        }
+        if (lines.isEmpty()) return emptyList()
+        return listOf("", "**Season so far**") + lines
+    }
+
+    private fun sameTeam(a: String, b: String): Boolean {
+        fun key(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+        return key(a).isNotEmpty() && key(a) == key(b)
     }
 
     internal fun teamTag(name: String): String {

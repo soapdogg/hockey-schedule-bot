@@ -28,6 +28,7 @@ class ScheduleBotRequestHandler() {
         val httpClient = HttpClient(okHttp)
         val gameExtractor = GameExtractor(httpClient)
         val gameSummaryExtractor = GameSummaryExtractor(httpClient)
+        val teamStatsExtractor = TeamStatsExtractor(httpClient)
         val database = Database(DynamoDbClient.create())
         val teams = listOf(
             Team("Reindeer5D", "10159", Fixtures.GOATS_CHANNEL, Fixtures.GOATS_CHANNEL_ID),
@@ -44,6 +45,7 @@ class ScheduleBotRequestHandler() {
 
                 val games = gameExtractor.extractGames(team)
                 println("Found ${games.size} game(s) for team ${team.name}")
+                val seasonContext by lazy { buildSeasonContext(teamStatsExtractor, team, games) }
                 games.forEach { game ->
                     try {
                         println("\nProcessing game #${game.number}: ${game.opponent} on ${game.date} @ ${game.time}")
@@ -102,7 +104,7 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
                             )
                         }
 
-                        if (game.gameId != null) {
+                        if (game.gameId != null && RecapWindow.isOpen(now, game)) {
                             val recapKey = game.hash + Fixtures.RECAP_RANGE_SUFFIX
                             val recapAlreadyPublished = database.hasItem(
                                 Fixtures.DEDUPE_TABLE_NAME,
@@ -118,7 +120,7 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
                                     println("Recap not ready yet for game ${game.gameId}; will retry next run.")
                                 } else {
                                     println("Recap ready: ${recap.goals.size} goal(s), ${recap.penalties.size} penalty/ies.")
-                                    val messages = RecapFormatter.format(game, recap)
+                                    val messages = RecapFormatter.format(game, recap, seasonContext)
                                     messages.forEach { httpClient.executeHttpPostRequest(team.webhookChannel, it) }
                                     database.putItem(
                                         Fixtures.DEDUPE_TABLE_NAME,
@@ -155,5 +157,23 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
             }
             throw RuntimeException("Hockey bot run failed for ${failures.size} team(s): $failures")
         }
+    }
+
+    private fun buildSeasonContext(
+        teamStatsExtractor: TeamStatsExtractor,
+        team: Team,
+        games: List<Game>,
+    ): SeasonContext {
+        val stats = try {
+            teamStatsExtractor.fetch(team.krakenWebsiteId)
+        } catch (e: Exception) {
+            println("WARNING: Could not fetch team stats for ${team.name}; recap will omit season leaders: ${e.message}")
+            null
+        }
+        val context = SeasonContext.from(games, stats)
+        if (stats != null && context.stats == null) {
+            println("Team stats page does not include the latest game yet; recap will omit season leaders.")
+        }
+        return context
     }
 }

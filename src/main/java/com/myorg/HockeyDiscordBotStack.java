@@ -68,7 +68,7 @@ public class HockeyDiscordBotStack extends Stack {
             .build();
 
         CfnSchedule.Builder.create(this, "HockeyBotSchedule")
-            .scheduleExpression("cron(0 20 ? * * *)")
+            .scheduleExpression("cron(0 9,20 ? * * *)")
             .scheduleExpressionTimezone("America/Vancouver")
             .flexibleTimeWindow(
                 CfnSchedule.FlexibleTimeWindowProperty.builder().mode("OFF").build()

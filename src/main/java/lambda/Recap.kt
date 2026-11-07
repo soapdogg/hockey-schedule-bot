@@ -18,6 +18,8 @@ data class Recap(
         val team: String,
         val scorer: String,
         val assists: List<String>,
+        /** Goal type badge from the league site, e.g. "PPG". Null for even-strength goals. */
+        val type: String? = null,
     )
 
     data class Penalty(

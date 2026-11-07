@@ -25,6 +25,8 @@ object Fixtures {
     const val GAME_ID_ATTRIBUTE_NAME = "game-id"
 
     const val RECAP_RANGE_SUFFIX = ":recap"
+    const val RECAP_MAX_AGE_DAYS = 3L
+    const val RECAP_TOP_SCORERS = 3
 
     const val HTTP_USER_AGENT = "hockey-schedule-bot/1.0 (+https://github.com/soapdogg/hockey-schedule-bot)"
 

@@ -16,7 +16,8 @@ Hockey Schedule Bot is an automated Discord bot built with AWS CDK, Kotlin, and 
 
 ### Key Features
 
-- **Automated Schedule Monitoring**: Runs on a scheduled basis (daily at 8 PM PST) via AWS EventBridge
+- **Automated Schedule Monitoring**: Runs twice a day (9 AM and 8 PM Pacific) via AWS EventBridge
+- **Game Recaps**: After a game, posts the final score, scoring, penalties, shots and saves, plus the season record, points leaders and goalie stats. Only games from the last 3 days are recapped.
 - **Discord Integration**: Posts game announcements with formatted messages and interactive polls
 - **Game Deduplication**: Uses DynamoDB to track previously published games and avoid duplicates
 - **Interactive Polls**: Creates Discord polls asking team members about their availability for games
@@ -29,7 +30,7 @@ The application is deployed as an AWS Lambda function orchestrated by AWS CDK:
 
 - **Lambda Function**: Kotlin-based handler that processes game schedules
 - **DynamoDB Table**: Stores published game IDs to prevent duplicate announcements
-- **EventBridge Schedule**: Triggers the Lambda function daily at 8 PM Pacific Time
+- **EventBridge Schedule**: Triggers the Lambda function at 9 AM and 8 PM Pacific Time
 - **Discord Webhooks**: Posts messages to Discord channels
 - **Discord Bot API**: Creates interactive polls for game attendance
 

@@ -33,6 +33,12 @@ class GameSummaryExtractor(
             ?: emptyList()
 
         val goals = parseGoals(scoringSummary)
+        // Per-period goals, not final totals: a shootout winner counts in the total but has no goal entry.
+        val expectedGoals = teams.sumOf { it.periods.sum() }
+        if (goals.size != expectedGoals) {
+            println("WARNING: Scoring table shows $expectedGoals goal(s) but ${goals.size} goal entries were parsed; not posting the recap.")
+            return null
+        }
         val penalties = h1ByText["PENALTY SUMMARY"]?.let { parsePenalties(it) } ?: emptyList()
 
         return Recap(
@@ -74,21 +80,24 @@ class GameSummaryExtractor(
                 val card = el.selectFirst("div.bg-light") ?: return@forEachSiblingUntilNextH1
                 val team = card.selectFirst("img[title]")?.attr("title")?.trim() ?: ""
                 val scorer = card.selectFirst("a.font-weight-bold")?.text()?.trim().orEmpty()
-                val assists = card.selectFirst("div.mt-1")
-                    ?.select("a")
-                    ?.map { it.text().trim() }
-                    ?.filter { it.isNotEmpty() }
-                    ?: emptyList()
-                val timeLine = card.selectFirst("div.text-nowrap")?.text()?.trim().orEmpty()
-                val time = timeLine.substringBefore("|").trim()
-                if (scorer.isNotEmpty() && time.isNotEmpty()) {
+                val assists = card.select("a.text-secondary")
+                    .map { it.text().trim() }
+                    .filter { it.isNotEmpty() }
+                    .map { PlayerNames.display(it) }
+                // The time sits in a div in older pages and a td in newer ones, as "5:08 | 1st".
+                val time = card.allElements
+                    .firstNotNullOfOrNull { GOAL_TIME.find(it.ownText())?.groupValues?.get(1) }
+                    .orEmpty()
+                val type = card.selectFirst(".badge")?.text()?.trim()?.takeIf { it.isNotEmpty() }
+                if (scorer.isNotEmpty()) {
                     goals.add(
                         Recap.Goal(
                             period = currentPeriod,
                             time = time,
                             team = team,
-                            scorer = scorer,
+                            scorer = PlayerNames.display(scorer),
                             assists = assists,
+                            type = type,
                         )
                     )
                 }
@@ -120,7 +129,7 @@ class GameSummaryExtractor(
                             period = currentPeriod,
                             time = time,
                             team = team,
-                            player = player,
+                            player = PlayerNames.display(player),
                             infraction = infraction,
                             duration = duration,
                         )
@@ -141,5 +150,9 @@ class GameSummaryExtractor(
             block(sibling)
             sibling = sibling.nextElementSibling()
         }
+    }
+
+    companion object {
+        private val GOAL_TIME = Regex("^\\s*(\\d{1,2}:\\d{2})\\s*\\|")
     }
 }
