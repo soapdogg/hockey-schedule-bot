@@ -38,6 +38,8 @@ class ScheduleBotRequestHandler() {
             gameArchive,
         )
         val insights = InsightService(gameArchive, InsightLog(dynamoDb))
+        val discord = DiscordApi(Fixtures.BOT_TOKEN)
+        val checkInStore = CheckInStore(dynamoDb)
         val teams = listOf(
             Team("Reindeer5D", "10159", Fixtures.GOATS_CHANNEL, Fixtures.GOATS_CHANNEL_ID),
         )
@@ -79,7 +81,8 @@ class ScheduleBotRequestHandler() {
                         )
                         println("Game already published: $hasGameBeenPreviouslyPublished")
 
-                        if (!hasGameBeenPreviouslyPublished) {
+                        // Check-ins replace the announcement and poll.
+                        if (!Fixtures.CHECK_INS_ENABLED && !hasGameBeenPreviouslyPublished) {
                             println("Publishing new game announcement...")
                             val arenaLink = Fixtures.ARENAS_TO_LOCATION.getValue(game.arena)
                             val dateString = game.date + " @ " + game.time
@@ -170,6 +173,21 @@ We will be playing at [${game.arena}](${arenaLink}) against the [${game.opponent
                     } catch (e: Exception) {
                         println("ERROR: Failed to process game #${game.number} for team ${team.name}: ${e.message}")
                         e.printStackTrace()
+                    }
+                }
+
+                if (Fixtures.CHECK_INS_ENABLED) {
+                    try {
+                        CheckInService(
+                            discord,
+                            checkInStore,
+                            team.apiChannelId,
+                            pickInsight = { insights.pick(team, it) },
+                            insightPosted = { insight, occasion -> insights.recordPosted(team, insight, occasion) },
+                        ).run(team, games, now)
+                    } catch (e: Exception) {
+                        println("ERROR: Check-ins failed for ${team.name}: ${e.message}")
+                        failures += "${team.name} check-ins: ${e.message?.take(200)}"
                     }
                 }
 

@@ -1,5 +1,6 @@
 package com.myorg;
 
+import software.amazon.awscdk.CfnOutput;
 import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.services.dynamodb.Attribute;
@@ -64,6 +65,15 @@ public class HockeyDiscordBotStack extends Stack {
             .billingMode(BillingMode.PAY_PER_REQUEST)
             .build();
 
+        // Who's in for each game: the check-in post, plus one item per answer.
+        final var checkInsTable = Table.Builder.create(this, "CheckIns")
+            .tableName("CheckIns")
+            .partitionKey(Attribute.builder().name("game").type(AttributeType.STRING).build())
+            .sortKey(Attribute.builder().name("member").type(AttributeType.STRING).build())
+            .timeToLiveAttribute("ttl")
+            .billingMode(BillingMode.PAY_PER_REQUEST)
+            .build();
+
         final var hockeyScheduleBotFunction = Function.Builder.create(this, "HockeyScheduleBot")
             .functionName("HockeyScheduleBot")
             .runtime(Runtime.JAVA_21)
@@ -83,6 +93,37 @@ public class HockeyDiscordBotStack extends Stack {
         dedupeTable.grantReadWriteData(hockeyScheduleBotFunction);
         gameArchiveTable.grantReadWriteData(hockeyScheduleBotFunction);
         insightLogTable.grantReadWriteData(hockeyScheduleBotFunction);
+        checkInsTable.grantReadWriteData(hockeyScheduleBotFunction);
+
+        // Discord's interactions endpoint for the check-in buttons. Discord gives it three
+        // seconds to answer, so it gets more memory (and with it more CPU) than the scheduled
+        // run, and SnapStart so it doesn't pay for JVM startup after sitting idle. This CDK
+        // version only allows SnapStart on x86.
+        final var interactionsFunction = Function.Builder.create(this, "DiscordInteractions")
+            .functionName("DiscordInteractions")
+            .runtime(Runtime.JAVA_21)
+            .memorySize(1024)
+            .timeout(Duration.seconds(10))
+            .code(new AssetCode(MAVEN_ASSET_CODE_PATH))
+            .handler("lambda.InteractionHandler::handleRequest")
+            .architecture(Architecture.X86_64)
+            .snapStart(SnapStartConf.ON_PUBLISHED_VERSIONS)
+            .build();
+        checkInsTable.grantReadWriteData(interactionsFunction);
+
+        // SnapStart only applies to published versions, so the URL points at an alias.
+        final var interactionsAlias = Alias.Builder.create(this, "DiscordInteractionsLive")
+            .aliasName("live")
+            .version(interactionsFunction.getCurrentVersion())
+            .build();
+        // Open to anyone; the handler refuses requests that Discord didn't sign.
+        final var interactionsUrl = interactionsAlias.addFunctionUrl(FunctionUrlOptions.builder()
+            .authType(FunctionUrlAuthType.NONE)
+            .build());
+        CfnOutput.Builder.create(this, "InteractionsEndpointUrl")
+            .description("Paste into the Discord developer portal as the Interactions Endpoint URL")
+            .value(interactionsUrl.getUrl())
+            .build();
 
         final var scheduleRole = Role.Builder.create(this, "ScheduleRole")
             .managedPolicies(List.of(ManagedPolicy.fromManagedPolicyArn(this, "scheduleManagedPolicy", "arn:aws:iam::aws:policy/service-role/AWSLambdaRole")))

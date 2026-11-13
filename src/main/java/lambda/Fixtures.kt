@@ -23,6 +23,7 @@ object Fixtures {
     const val DEDUPE_TABLE_NAME = "DedupeTable"
     const val GAME_ARCHIVE_TABLE_NAME = "GameArchive"
     const val INSIGHT_LOG_TABLE_NAME = "InsightLog"
+    const val CHECK_INS_TABLE_NAME = "CheckIns"
     const val TEAM_ATTRIBUTE_NAME = "team"
     const val GAME_ID_ATTRIBUTE_NAME = "game-id"
 
@@ -36,6 +37,18 @@ object Fixtures {
     val GOATS_CHANNEL_ID: String = System.getenv("GOATS_CHANNEL_ID") ?: ""
 
     val BOT_TOKEN: String = System.getenv("DISCORDBOTTOKEN") ?: ""
+
+    /**
+     * Check-in posts with buttons, sent by the bot, replace the announcement and poll. Needs the
+     * bot in the team's server and the interactions endpoint set up (see README).
+     */
+    const val CHECK_INS_ENABLED = false
+
+    /**
+     * The Discord application's public key, for checking that button presses really come from
+     * Discord. Public by design: only Discord holds the matching private key.
+     */
+    const val DISCORD_PUBLIC_KEY = "bda8cc01bbba9584a6d98df5b9b7d1448e1d0068ad0db7e5397315be552d4880"
 
     val ALERT_WEBHOOK_URL: String = System.getenv("ALERT_WEBHOOK_URL") ?: GOATS_CHANNEL
 }

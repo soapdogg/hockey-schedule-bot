@@ -23,6 +23,7 @@ Hockey Schedule Bot is an automated Discord bot built with AWS CDK, Kotlin, and 
 - **Game Archive**: Stores every completed game's full scoresheet (both teams) and official result in DynamoDB, as the basis for analytics
 - **Stat Insights**: Adds one stat insight to each game announcement and recap, such as the team's record when it scores first or a milestone a player is about to reach, plus a midweek post when something stands out
 - **Interactive Polls**: Creates Discord polls asking team members about their availability for games
+- **Check-ins** (switched on with `CHECK_INS_ENABLED`): replaces the announcement and poll with a check-in post a week before each game, with a button per position, reminders for anyone who hasn't answered, and a game-day post with who's playing
 - **Arena Location Links**: Provides Google Maps links for all arena locations
 - **AWS Lambda Deployment**: Serverless architecture using AWS Lambda for scalability and cost-efficiency
 
@@ -31,7 +32,8 @@ Hockey Schedule Bot is an automated Discord bot built with AWS CDK, Kotlin, and 
 The application is deployed as an AWS Lambda function orchestrated by AWS CDK:
 
 - **Lambda Function**: Kotlin-based handler that processes game schedules
-- **DynamoDB Tables**: `DedupeTable` stores published game IDs to prevent duplicate announcements; `GameArchive` stores completed games (kept if the stack is deleted); `InsightLog` records posted insights so they don't repeat
+- **DynamoDB Tables**: `DedupeTable` stores published game IDs to prevent duplicate announcements; `GameArchive` stores completed games (kept if the stack is deleted); `InsightLog` records posted insights so they don't repeat; `CheckIns` holds each game's check-in post and answers
+- **Interactions Lambda**: Receives check-in button presses from Discord through a function URL
 - **EventBridge Schedule**: Triggers the Lambda function at 9 AM and 8 PM Pacific Time
 - **Discord Webhooks**: Posts messages to Discord channels
 - **Discord Bot API**: Creates interactive polls for game attendance
@@ -195,6 +197,34 @@ AWS_REGION=<stack region> java -cp "target/classes:$(cat cp.txt)" lambda.Insight
 
 Add `--jsonl games.jsonl` to read a file from `HistoricalScraper --jsonl` instead of DynamoDB, and
 `--post 3` to post three sample insights to `GOATS_WEBHOOK_URL`.
+
+### Check-ins
+
+When `Fixtures.CHECK_INS_ENABLED` is on, the bot posts a check-in for each game a week ahead, in
+place of the announcement and poll. Everyone in the server can tap Forward, Defense, Flex, Goalie
+or Out, and change it until the game starts; the post updates as people answer. People who
+haven't answered get reminded on mornings until three days out, then mornings and evenings. On
+game day the morning post counts who's playing, warns about a missing goalie or a short bench,
+adds a stat insight, and the bot sends a direct message to anyone still missing. When the game
+starts the post closes.
+
+The posts come from the bot rather than the webhook, since webhooks can't carry buttons. Button
+presses go to the `DiscordInteractions` Lambda, which checks Discord's signature on every request.
+One-time setup in the [Discord developer portal](https://discord.com/developers/applications):
+
+1. Invite the bot to the server with the View Channels, Send Messages and Read Message History
+   permissions.
+2. Under **Bot**, turn on **Server Members Intent**, so the bot can tell who hasn't answered.
+3. Under **General Information**, set **Interactions Endpoint URL** to the stack's
+   `InteractionsEndpointUrl` output.
+
+To try it in another channel first, `CheckInDryRun` runs the steps for one game. Pass `--now` to
+step through the week: the post, reminders, the game-day post and closing:
+
+```bash
+DISCORDBOTTOKEN=<token> AWS_REGION=<stack region> java -cp "target/classes:$(cat cp.txt)" \
+  lambda.CheckInDryRun --channel <channel id> --now 2026-11-12T08:00
+```
 
 ## Project Structure
 
