@@ -120,6 +120,15 @@ public class HockeyDiscordBotStack extends Stack {
         final var interactionsUrl = interactionsAlias.addFunctionUrl(FunctionUrlOptions.builder()
             .authType(FunctionUrlAuthType.NONE)
             .build());
+        // Function URLs also need lambda:InvokeFunction. InvokedViaFunctionUrl limits it to calls
+        // through the URL, so nobody can invoke the function directly. This CDK version has no
+        // typed field for it yet.
+        final var invokeViaUrl = CfnPermission.Builder.create(this, "DiscordInteractionsInvokeViaUrl")
+            .action("lambda:InvokeFunction")
+            .functionName(interactionsAlias.getFunctionArn())
+            .principal("*")
+            .build();
+        invokeViaUrl.addPropertyOverride("InvokedViaFunctionUrl", true);
         CfnOutput.Builder.create(this, "InteractionsEndpointUrl")
             .description("Paste into the Discord developer portal as the Interactions Endpoint URL")
             .value(interactionsUrl.getUrl())
