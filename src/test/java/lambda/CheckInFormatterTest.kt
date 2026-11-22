@@ -86,6 +86,9 @@ class CheckInFormatterTest {
             (1..10).map { answer("$it", "P$it", Position.FORWARD) } + answer("11", "G", Position.GOALIE),
         )
         assertNull(CheckInFormatter.warning(full))
+        val nobody = CheckInState(game(), emptyList())
+        assertEquals("⚠️ No goalie yet and no skaters.", CheckInFormatter.warning(nobody))
+        assertEquals("no skaters and no goalie", CheckInFormatter.status(nobody))
         assertEquals("10 skaters and 1 goalie", CheckInFormatter.status(full))
     }
 

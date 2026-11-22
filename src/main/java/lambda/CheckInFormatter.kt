@@ -74,7 +74,7 @@ object CheckInFormatter {
     )
 
     fun status(state: CheckInState): String {
-        val skaters = "${state.skaters} skater${if (state.skaters == 1) "" else "s"}"
+        val skaters = if (state.skaters == 0) "no skaters" else "${state.skaters} skater${if (state.skaters == 1) "" else "s"}"
         val goalies = when (state.goalies) {
             0 -> "no goalie"
             1 -> "1 goalie"
@@ -86,7 +86,10 @@ object CheckInFormatter {
     fun warning(state: CheckInState): String? {
         val problems = buildList {
             if (state.goalies == 0) add("no goalie yet")
-            if (state.skaters < MIN_SKATERS) add("only ${state.skaters} skater${if (state.skaters == 1) "" else "s"}")
+            when {
+                state.skaters == 0 -> add("no skaters")
+                state.skaters < MIN_SKATERS -> add("only ${state.skaters} skater${if (state.skaters == 1) "" else "s"}")
+            }
         }
         if (problems.isEmpty()) return null
         return "⚠️ " + problems.joinToString(" and ").replaceFirstChar { it.uppercase() } + "."
