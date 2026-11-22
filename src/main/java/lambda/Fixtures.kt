@@ -42,7 +42,7 @@ object Fixtures {
      * Check-in posts with buttons, sent by the bot, replace the announcement and poll. Needs the
      * bot in the team's server and the interactions endpoint set up (see README).
      */
-    const val CHECK_INS_ENABLED = false
+    const val CHECK_INS_ENABLED = true
 
     /**
      * The Discord application's public key, for checking that button presses really come from
