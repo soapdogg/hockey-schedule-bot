@@ -2,10 +2,14 @@ package lambda
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import lambda.CheckInTestData.answer
 import lambda.CheckInTestData.game
 import org.junit.jupiter.api.Test
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest
+import software.amazon.awssdk.services.dynamodb.model.GetItemResponse
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest
 import software.amazon.awssdk.services.dynamodb.model.PutItemResponse
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest
@@ -22,7 +26,7 @@ class CheckInStoreTest {
     fun `saves the post and answers, and reads them back`() {
         val puts = mutableListOf<PutItemRequest>()
         every { ddb.putItem(capture(puts)) } returns PutItemResponse.builder().build()
-        val game = game(remindedSlot = "2026-11-12-am", reminderMessageId = "77", gameDayPosted = true)
+        val game = game(remindedSlot = "2026-11-12-am", reminderMessageId = "77", gameDayPosted = true, aliases = mapOf("5" to "4"))
         val answer = answer("2", "Ben", Position.DEFENSE)
         store.saveGame(game)
         store.saveResponse(game, answer)
@@ -35,6 +39,19 @@ class CheckInStoreTest {
         every { ddb.query(capture(query)) } returns QueryResponse.builder().items(puts.map { it.item() }).build()
         assertEquals(CheckInState(game, listOf(answer)), store.load(game.key))
         assertTrue(query.single().consistentRead())
+    }
+
+    @Test
+    fun `reads linked accounts from the settings item`() {
+        val request = slot<GetItemRequest>()
+        every { ddb.getItem(capture(request)) } returns GetItemResponse.builder().item(
+            mapOf("linked-accounts" to AttributeValue.fromM(mapOf("5" to AttributeValue.fromS("4"))))
+        ).build()
+        assertEquals(mapOf("5" to "4"), store.linkedAccounts())
+        assertEquals("#settings", request.captured.key().getValue("game").s())
+
+        every { ddb.getItem(any<GetItemRequest>()) } returns GetItemResponse.builder().build()
+        assertEquals(emptyMap(), store.linkedAccounts())
     }
 
     @Test

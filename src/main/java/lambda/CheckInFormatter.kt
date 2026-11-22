@@ -34,9 +34,9 @@ object CheckInFormatter {
             1L -> "⏰ ${title(game)} is tomorrow at ${game.start.format(TIME)}."
             else -> "⏰ ${title(game)} is on ${game.start.format(DAY)} at ${game.start.format(TIME)}."
         }
-        val waiting = state.noReply.map { it.first }
+        val waiting = state.noReplyAccounts
         val content = listOfNotNull(
-            "$lead Still waiting on ${waiting.joinToString(" ") { "<@$it>" }}: tap your position on the check-in post.",
+            "$lead Still waiting on ${state.noReplyMentions.joinToString(" ")}: tap your position on the check-in post.",
             "So far: ${status(state)}.",
             warning(state),
         ).joinToString("\n")
@@ -53,7 +53,7 @@ object CheckInFormatter {
         val playing = state.responses.filter { it.position.playing }
         val breakdown = Position.entries.filter { it.playing }
             .mapNotNull { p -> state.responses.count { it.position == p }.takeIf { it > 0 }?.let { "$it ${p.short}" } }
-        val waiting = state.noReply.map { it.first }
+        val waiting = state.noReplyAccounts
         val content = listOfNotNull(
             "🏒 **Game day!** ${title(game)} tonight at ${game.start.format(TIME)} · $arena · ${game.homeAway.lowercase()}",
             "**Playing (${playing.size}):** ${breakdown.joinToString(" · ").ifEmpty { "nobody yet" }}",
@@ -61,7 +61,7 @@ object CheckInFormatter {
             if (waiting.isEmpty()) {
                 "Full lineup: ${game.link}"
             } else {
-                "Still no answer from ${waiting.joinToString(" ") { "<@$it>" }}: check in here: ${game.link}"
+                "Still no answer from ${state.noReplyMentions.joinToString(" ")}: check in here: ${game.link}"
             },
             insight?.let { "\n" + RecapFormatter.insightLine(it) },
         ).joinToString("\n")

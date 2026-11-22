@@ -73,9 +73,12 @@ class InteractionHandler(
         if (state.game.closed || !state.game.start.isAfter(LocalDateTime.now(clock))) {
             return ephemeral("Check-ins for this game closed when it started.")
         }
-        val answer = CheckInResponse(userId, name, position, clock.instant())
+        // Someone with two accounts gets one answer, whichever account they tap from.
+        val personId = state.game.personOf(userId)
+        val personName = if (personId != userId) state.game.roster[personId] ?: name else name
+        val answer = CheckInResponse(personId, personName, position, clock.instant())
         store.saveResponse(state.game, answer)
-        println("$name checked in as ${position.label} for $key")
+        println("$personName checked in as ${position.label} for $key")
         return mapOf("type" to UPDATE_MESSAGE, "data" to CheckInFormatter.post(state.with(answer)))
     }
 

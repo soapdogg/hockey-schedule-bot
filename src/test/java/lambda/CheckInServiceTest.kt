@@ -61,6 +61,21 @@ class CheckInServiceTest {
     }
 
     @Test
+    fun `folds linked accounts into one person and messages both on game day`() {
+        every { discord.members("900") } returns ROSTER + ("5" to "dee2")
+        every { store.linkedAccounts() } returns mapOf("5" to "4")
+        run(LocalDateTime.of(2026, 11, 10, 8, 0), null)
+        assertEquals(ROSTER, saved.single().roster)
+        assertEquals(mapOf("5" to "4"), saved.single().aliases)
+
+        val everyoneButDee = listOf("1", "2", "3").map { answer(it, ROSTER.getValue(it), Position.FORWARD) }
+        run(LocalDateTime.of(2026, 11, 16, 8, 0), CheckInState(saved.single(), everyoneButDee))
+        verify { discord.sendDirectMessage("4", any()) }
+        verify { discord.sendDirectMessage("5", any()) }
+        verify(exactly = 2) { discord.sendDirectMessage(any(), any()) }
+    }
+
+    @Test
     fun `still opens when the server members can't be listed`() {
         every { discord.members("900") } throws DiscordException(403, "Missing Access")
         run(LocalDateTime.of(2026, 11, 10, 8, 0), null)

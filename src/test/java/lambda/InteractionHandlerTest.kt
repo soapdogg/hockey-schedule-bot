@@ -101,6 +101,17 @@ class InteractionHandlerTest {
     }
 
     @Test
+    fun `a press from someone's second account counts as theirs`() {
+        every { store.load(KEY) } returns CheckInState(game(aliases = mapOf("2" to "4")), emptyList())
+        val saved = slot<CheckInResponse>()
+        every { store.saveResponse(any(), capture(saved)) } just runs
+        val content = reply(handler.handle(event(press(Position.FLEX))))
+            .getValue("data").jsonObject.getValue("content").jsonPrimitive.content
+        assertEquals("4" to "Dee", saved.captured.userId to saved.captured.name)
+        assertTrue("**Flex (1):** Dee" in content, content)
+    }
+
+    @Test
     fun `presses after the start or on unknown games only answer the presser`() {
         every { store.load(KEY) } returns CheckInState(game(closed = true), emptyList())
         val closed = reply(handler.handle(event(press(Position.FORWARD))))

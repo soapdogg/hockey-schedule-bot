@@ -46,9 +46,28 @@ data class CheckInGame(
     val gameDayPosted: Boolean = false,
     val directMessagesSent: Boolean = false,
     val closed: Boolean = false,
+    /** Extra accounts of people on the roster: account ID to the roster ID it belongs to. */
+    val aliases: Map<String, String> = emptyMap(),
 ) {
     val link: String get() = "https://discord.com/channels/$guildId/$channelId/$messageId"
     val startEpochSecond: Long get() = start.atZone(CheckIns.ZONE).toEpochSecond()
+
+    /** The roster ID of whoever uses [accountId]. */
+    fun personOf(accountId: String): String = aliases[accountId] ?: accountId
+
+    /** Every account a person on the roster uses, so a mention reaches them on any of them. */
+    fun accountsOf(personId: String): List<String> = listOf(personId) + aliases.filterValues { it == personId }.keys.sorted()
+}
+
+/** Everyone expected to answer, with extra accounts folded into the person who uses them. */
+data class Roster(val people: Map<String, String>, val aliases: Map<String, String> = emptyMap()) {
+    companion object {
+        /** [linked] maps an extra account to the person's main one; links to people who left are ignored. */
+        fun of(members: Map<String, String>, linked: Map<String, String>): Roster {
+            val aliases = linked.filter { (account, person) -> account != person && account in members && person in members }
+            return Roster(members - aliases.keys, aliases)
+        }
+    }
 }
 
 data class CheckInState(val game: CheckInGame, val responses: List<CheckInResponse>) {
@@ -61,9 +80,15 @@ data class CheckInState(val game: CheckInGame, val responses: List<CheckInRespon
     /** Roster members who haven't answered, by user ID, sorted by name. */
     val noReply: List<Pair<String, String>>
         get() {
-            val answered = responses.map { it.userId }.toSet()
+            val answered = responses.map { game.personOf(it.userId) }.toSet()
             return game.roster.filterKeys { it !in answered }.toList().sortedBy { it.second.lowercase() }
         }
+
+    /** Mentions for everyone who hasn't answered, on all of their accounts. */
+    val noReplyMentions: List<String>
+        get() = noReply.map { (id, _) -> game.accountsOf(id).joinToString(" / ") { "<@$it>" } }
+
+    val noReplyAccounts: List<String> get() = noReply.flatMap { game.accountsOf(it.first) }
 
     /** The state with [response] replacing any earlier answer from the same person. */
     fun with(response: CheckInResponse): CheckInState =

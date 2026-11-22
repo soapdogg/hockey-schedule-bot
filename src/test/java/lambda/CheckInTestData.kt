@@ -27,6 +27,7 @@ object CheckInTestData {
         gameDayPosted: Boolean = false,
         directMessagesSent: Boolean = false,
         closed: Boolean = false,
+        aliases: Map<String, String> = emptyMap(),
     ) = CheckInGame(
         key = KEY,
         number = "8",
@@ -43,6 +44,7 @@ object CheckInTestData {
         gameDayPosted = gameDayPosted,
         directMessagesSent = directMessagesSent,
         closed = closed,
+        aliases = aliases,
     )
 
     fun answer(userId: String, name: String, position: Position) =

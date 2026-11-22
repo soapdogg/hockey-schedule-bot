@@ -2,6 +2,7 @@ package lambda
 
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest
 import java.time.Duration
@@ -56,6 +57,7 @@ class CheckInStore(
             put("game-day-posted", AttributeValue.fromBool(game.gameDayPosted))
             put("direct-messages-sent", AttributeValue.fromBool(game.directMessagesSent))
             put("closed", AttributeValue.fromBool(game.closed))
+            if (game.aliases.isNotEmpty()) put("aliases", AttributeValue.fromM(game.aliases.mapValues { AttributeValue.fromS(it.value) }))
             put(TTL, ttl(game.start))
         }
         ddb.putItem(PutItemRequest.builder().tableName(tableName).item(item).build())
@@ -71,6 +73,22 @@ class CheckInStore(
             TTL to ttl(game.start),
         )
         ddb.putItem(PutItemRequest.builder().tableName(tableName).item(item).build())
+    }
+
+    /**
+     * People with more than one Discord account: extra account ID to main account ID. Set by hand
+     * in the settings item, so member IDs stay out of the code:
+     *
+     *   aws dynamodb put-item --table-name CheckIns --item \
+     *     '{"game":{"S":"#settings"},"member":{"S":"#settings"},"linked-accounts":{"M":{"<extra id>":{"S":"<main id>"}}}}'
+     */
+    fun linkedAccounts(): Map<String, String> {
+        val request = GetItemRequest.builder()
+            .tableName(tableName)
+            .key(mapOf(GAME to AttributeValue.fromS(SETTINGS), MEMBER to AttributeValue.fromS(SETTINGS)))
+            .build()
+        val item = ddb.getItem(request).item() ?: return emptyMap()
+        return item["linked-accounts"]?.m()?.mapValues { it.value.s() } ?: emptyMap()
     }
 
     private fun parseGame(key: String, item: Map<String, AttributeValue>): CheckInGame? = runCatching {
@@ -90,6 +108,7 @@ class CheckInStore(
             gameDayPosted = item["game-day-posted"]?.bool() ?: false,
             directMessagesSent = item["direct-messages-sent"]?.bool() ?: false,
             closed = item["closed"]?.bool() ?: false,
+            aliases = item["aliases"]?.m()?.mapValues { it.value.s() } ?: emptyMap(),
         )
     }.getOrNull()
 
@@ -112,6 +131,9 @@ class CheckInStore(
 
         /** Sorts before any Discord user ID, which are all digits. */
         const val GAME_ITEM = "#game"
+
+        /** Partition and sort key of the settings item, which no game key can collide with. */
+        const val SETTINGS = "#settings"
         val RETENTION: Duration = Duration.ofDays(60)
     }
 }

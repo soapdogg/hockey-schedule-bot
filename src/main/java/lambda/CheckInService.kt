@@ -32,7 +32,7 @@ class CheckInService(
                 val saved = store.load(key)
                 when {
                     !start.isAfter(now) -> if (saved != null && !saved.game.closed) close(saved)
-                    saved == null -> open(key, game, start, guildId, roster ?: emptyMap(), now)
+                    saved == null -> open(key, game, start, guildId, roster ?: Roster(emptyMap()), now)
                     else -> update(saved, game, start, roster, now)
                 }
             } catch (e: Exception) {
@@ -44,7 +44,7 @@ class CheckInService(
         if (failures.isNotEmpty()) throw IllegalStateException("Check-ins failed for ${failures.joinToString("; ")}")
     }
 
-    private fun open(key: String, game: Game, start: LocalDateTime, guildId: String, roster: Map<String, String>, now: LocalDateTime) {
+    private fun open(key: String, game: Game, start: LocalDateTime, guildId: String, roster: Roster, now: LocalDateTime) {
         val draft = CheckInGame(
             key = key,
             number = game.number,
@@ -55,7 +55,8 @@ class CheckInService(
             guildId = guildId,
             channelId = channelId,
             messageId = "",
-            roster = roster,
+            roster = roster.people,
+            aliases = roster.aliases,
             // The post itself is this run's reminder.
             remindedSlot = slot(now),
         )
@@ -64,7 +65,7 @@ class CheckInService(
         println("Opened check-in for game #${game.number} vs ${game.opponent}")
     }
 
-    private fun update(saved: CheckInState, game: Game, start: LocalDateTime, roster: Map<String, String>?, now: LocalDateTime) {
+    private fun update(saved: CheckInState, game: Game, start: LocalDateTime, roster: Roster?, now: LocalDateTime) {
         // Pick up schedule changes and new server members, and redraw the post in case two
         // answers raced and one of them redrew it with stale data.
         var current = saved.game.copy(
@@ -72,7 +73,8 @@ class CheckInService(
             start = start,
             arena = game.arena,
             homeAway = game.ha,
-            roster = roster ?: saved.game.roster,
+            roster = roster?.people ?: saved.game.roster,
+            aliases = roster?.aliases ?: saved.game.aliases,
         )
         var state = saved.copy(game = current)
         try {
@@ -94,12 +96,14 @@ class CheckInService(
             insight?.let { insightPosted(it, occasion) }
             current = current.copy(gameDayPosted = true, remindedSlot = slot, reminderMessageId = null)
             if (!current.directMessagesSent) {
-                for ((userId, name) in state.noReply) {
-                    try {
-                        discord.sendDirectMessage(userId, CheckInFormatter.directMessage(current))
-                    } catch (e: Exception) {
-                        // People can turn off direct messages from server members.
-                        println("WARNING: Could not send a direct message to $name: ${e.message}")
+                for ((personId, name) in state.noReply) {
+                    for (accountId in current.accountsOf(personId)) {
+                        try {
+                            discord.sendDirectMessage(accountId, CheckInFormatter.directMessage(current))
+                        } catch (e: Exception) {
+                            // People can turn off direct messages from server members.
+                            println("WARNING: Could not send a direct message to $name: ${e.message}")
+                        }
                     }
                 }
                 current = current.copy(directMessagesSent = true)
@@ -120,8 +124,8 @@ class CheckInService(
         println("Closed check-in for game #${game.number} vs ${game.opponent}")
     }
 
-    private fun roster(guildId: String): Map<String, String>? = try {
-        discord.members(guildId)
+    private fun roster(guildId: String): Roster? = try {
+        Roster.of(discord.members(guildId), store.linkedAccounts())
     } catch (e: DiscordException) {
         // Most likely the Server Members intent is off. Without a roster there's no
         // "No reply" list and no reminders, but check-ins still work.

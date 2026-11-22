@@ -1,5 +1,6 @@
 package lambda
 
+import lambda.CheckInTestData.ROSTER
 import lambda.CheckInTestData.answer
 import lambda.CheckInTestData.game
 import org.junit.jupiter.api.Test
@@ -96,6 +97,22 @@ class CheckInFormatterTest {
         assertNull(CheckIns.parseButtonId("ci|x|MAYBE"))
         assertNull(CheckIns.parseButtonId("ci||OUT"))
         assertEquals("10159:2026-11-16:Fossils", CheckIns.key("10159", CheckInTestData.START, "Fossils"))
+    }
+
+    @Test
+    fun `someone with two accounts is one person, mentioned on both`() {
+        val roster = Roster.of(ROSTER + ("5" to "dee2"), linked = mapOf("5" to "4", "8" to "9"))
+        assertEquals(ROSTER, roster.people)
+        assertEquals(mapOf("5" to "4"), roster.aliases, "links to people not in the server are ignored")
+
+        val linked = CheckInState(game(aliases = roster.aliases), state.responses)
+        assertEquals(listOf("4" to "Dee"), linked.noReply)
+        val reminder = CheckInFormatter.reminder(linked, LocalDate.of(2026, 11, 12))
+        assertTrue("Still waiting on <@4> / <@5>:" in reminder["content"] as String, reminder["content"] as String)
+        assertEquals(mapOf("users" to listOf("4", "5")), reminder["allowed_mentions"])
+
+        // An answer saved under the extra account still counts.
+        assertEquals(emptyList(), linked.with(answer("5", "dee2", Position.GOALIE)).noReply)
     }
 
     @Test

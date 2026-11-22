@@ -218,6 +218,15 @@ One-time setup in the [Discord developer portal](https://discord.com/developers/
 3. Under **General Information**, set **Interactions Endpoint URL** to the stack's
    `InteractionsEndpointUrl` output.
 
+If someone is in the server with two accounts, link them so they count as one person: either
+account can answer, and reminders and direct messages go to both. The links live in a settings
+item in the `CheckIns` table, keeping member IDs out of the code:
+
+```bash
+aws dynamodb put-item --table-name CheckIns --item \
+  '{"game":{"S":"#settings"},"member":{"S":"#settings"},"linked-accounts":{"M":{"<extra account id>":{"S":"<main account id>"}}}}'
+```
+
 To try it in another channel first, `CheckInDryRun` runs the steps for one game. Pass `--now` to
 step through the week: the post, reminders, the game-day post and closing:
 
