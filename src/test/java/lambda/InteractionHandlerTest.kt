@@ -112,6 +112,14 @@ class InteractionHandlerTest {
     }
 
     @Test
+    fun `warming up reads from DynamoDB but writes nothing`() {
+        every { store.load(InteractionHandler.PRIME_KEY) } returns null
+        handler.prime()
+        verify { store.load(InteractionHandler.PRIME_KEY) }
+        verify(exactly = 0) { store.saveResponse(any(), any()) }
+    }
+
+    @Test
     fun `presses after the start or on unknown games only answer the presser`() {
         every { store.load(KEY) } returns CheckInState(game(closed = true), emptyList())
         val closed = reply(handler.handle(event(press(Position.FORWARD))))

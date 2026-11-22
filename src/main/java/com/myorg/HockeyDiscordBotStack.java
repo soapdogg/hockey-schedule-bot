@@ -102,10 +102,13 @@ public class HockeyDiscordBotStack extends Stack {
         final var interactionsFunction = Function.Builder.create(this, "DiscordInteractions")
             .functionName("DiscordInteractions")
             .runtime(Runtime.JAVA_21)
-            .memorySize(1024)
+            // More memory means more CPU for the first press after a restore.
+            .memorySize(2048)
             .timeout(Duration.seconds(10))
             .code(new AssetCode(MAVEN_ASSET_CODE_PATH))
             .handler("lambda.InteractionHandler::handleRequest")
+            // Faster startup for short-lived Lambda JVMs.
+            .environment(Map.of("JAVA_TOOL_OPTIONS", "-XX:+TieredCompilation -XX:TieredStopAtLevel=1"))
             .architecture(Architecture.X86_64)
             .snapStart(SnapStartConf.ON_PUBLISHED_VERSIONS)
             .build();

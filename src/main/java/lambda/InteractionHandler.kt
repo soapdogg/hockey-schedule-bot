@@ -10,6 +10,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.crac.Core
+import org.crac.Resource
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient
 import java.io.InputStream
 import java.io.OutputStream
@@ -31,7 +33,40 @@ class InteractionHandler(
     private val signature: DiscordSignature = DiscordSignature(Fixtures.DISCORD_PUBLIC_KEY),
     private val store: CheckInStore = CheckInStore(DynamoDbClient.create()),
     private val clock: Clock = Clock.system(CheckIns.ZONE),
-) : RequestStreamHandler {
+) : RequestStreamHandler, Resource {
+
+    init {
+        // Lambda calls beforeCheckpoint while it takes the SnapStart snapshot; elsewhere it never runs.
+        Core.getGlobalContext().register(this)
+    }
+
+    override fun beforeCheckpoint(context: org.crac.Context<out Resource>?) = prime()
+
+    override fun afterRestore(context: org.crac.Context<out Resource>?) {}
+
+    /**
+     * Does a button press's slow first-time work before the snapshot is taken: the signature
+     * check, JSON, a DynamoDB read and drawing the post. Otherwise a press that lands on a fresh
+     * copy takes longer than the three seconds Discord waits. Nothing is written.
+     */
+    fun prime() {
+        val started = System.nanoTime()
+        runCatching {
+            val press = """{"type":3,"data":{"custom_id":"${CheckIns.buttonId(PRIME_KEY, Position.FORWARD)}"},""" +
+                """"member":{"user":{"id":"0","username":"prime"}}}"""
+            // A made-up signature, so this goes through the check and is refused.
+            val headers = mapOf("x-signature-ed25519" to JsonPrimitive("00".repeat(64)), "x-signature-timestamp" to JsonPrimitive("0"))
+            handle(JsonObject(mapOf("headers" to JsonObject(headers), "body" to JsonPrimitive(press))))
+            // The rest of a press: reading the game (there is none) and the redrawn post as JSON.
+            button(Json.parseToJsonElement(press).jsonObject)
+            val game = CheckInGame(
+                PRIME_KEY, "1", "Prime", LocalDateTime.now(clock).plusDays(1), "", "HOME", "0", "0", "0", mapOf("0" to "prime"),
+            )
+            val state = CheckInState(game, listOf(CheckInResponse("0", "prime", Position.FORWARD, clock.instant())))
+            JsonSerializer.serializeToString(mapOf("type" to UPDATE_MESSAGE, "data" to CheckInFormatter.post(state)))
+        }.onFailure { println("WARNING: Warm-up before the snapshot failed: ${it.message}") }
+        println("Warmed up in ${(System.nanoTime() - started) / 1_000_000} ms")
+    }
 
     override fun handleRequest(input: InputStream, output: OutputStream, context: Context?) {
         val event = Json.parseToJsonElement(input.readBytes().decodeToString()).jsonObject
@@ -99,6 +134,9 @@ class InteractionHandler(
     private fun JsonObject.string(name: String): String? = this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
 
     companion object {
+        /** A game key no real or test check-in uses. */
+        const val PRIME_KEY = "#prime"
+
         private const val PING = 1
         private const val MESSAGE_COMPONENT = 3
         private const val PONG = 1
